@@ -3,6 +3,7 @@
 Sito Next.js 15 + Tailwind CSS per Stefano Porro — SPMAB.
 
 ## Struttura file
+## RIga
 
 ```
 spmab-website/
