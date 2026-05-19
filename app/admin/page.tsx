@@ -53,7 +53,8 @@ export default function AdminPage() {
     setAuthError("");
     const res = await fetch("/api/subscribers", { headers: { "x-admin-password": password } });
     setAuthLoading(false);
-    if (!res.ok) { setAuthError("Password errata. Riprova."); return; }
+    if (res.status === 401) { setAuthError("Password errata. Riprova."); return; }
+    if (!res.ok) { setAuthError(`Errore server: ${data.error ?? res.status}`); return; }
     const data = await res.json();
     setSubscribers(data.subscribers);
     setAuthenticated(true);
