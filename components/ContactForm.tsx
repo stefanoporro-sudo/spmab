@@ -7,19 +7,19 @@ const contactInfo = [
   {
     icon: Mail,
     label: "Email",
-    value: "stefano.porro@networktoday.eu",
-    href: "mailto:stefano.porro@networktoday.eu",
+    value: "porroste80@gmail.com",
+    href: "mailto:porroste80@gmail.com",
   },
   {
     icon: Phone,
     label: "Telefono",
-    value: "+39 — contattaci per il numero",
+    value: "+39 — 3933602014",
     href: "#",
   },
   {
     icon: MapPin,
     label: "Zona operativa",
-    value: "Italia — disponibile anche online",
+    value: "Italia — Europa",
     href: "#",
   },
 ];
