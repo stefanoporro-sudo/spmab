@@ -36,15 +36,11 @@ export default function About() {
           <div className="relative order-2 lg:order-1">
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-brand-900 to-dark-700 aspect-[4/5] max-w-md mx-auto lg:mx-0 border border-brand-700/30">
               {/* Decorative placeholder */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                <div className="w-24 h-24 rounded-full bg-brand-500/20 border-2 border-brand-400/40 flex items-center justify-center mb-6">
-                  <span className="font-display text-4xl font-bold text-brand-300">SP</span>
-                </div>
-                <p className="text-brand-300/60 text-sm italic">
-                  Inserisci qui una tua foto professionale
-                </p>
-              </div>
-
+              <img
+  src="/stefano.jpg"
+  alt="Stefano Porro - SPMAB"
+  className="absolute inset-0 w-full h-full object-cover object-top"
+/>
               {/* Floating badge */}
               <div className="absolute bottom-6 left-6 right-6 bg-dark-900/90 backdrop-blur-sm border border-brand-500/30 rounded-2xl p-4">
                 <div className="flex items-center gap-3">
