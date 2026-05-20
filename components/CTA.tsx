@@ -32,13 +32,22 @@ export default function CTA() {
               Contattaci oggi e costruiamo insieme il tuo percorso di successo.
             </p>
 
-            <a
-              href="#contatti"
-              className="inline-flex items-center gap-3 bg-white text-brand-700 font-bold px-10 py-4 rounded-full hover:bg-brand-50 transition-all duration-300 hover:scale-105 hover:shadow-2xl text-base"
-            >
-              Richiedi la consulenza gratuita
-              <ArrowRight size={18} />
-            </a>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a
+                href="#contatti"
+                className="inline-flex items-center gap-3 bg-white text-brand-700 font-bold px-10 py-4 rounded-full hover:bg-brand-50 transition-all duration-300 hover:scale-105 hover:shadow-2xl text-base"
+              >
+                Richiedi la consulenza gratuita
+                <ArrowRight size={18} />
+              </a>
+              <a
+                href="/ricette"
+                className="inline-flex items-center gap-3 bg-white/20 hover:bg-white/30 text-white font-semibold px-8 py-4 rounded-full transition-all duration-300 hover:scale-105 text-base border border-white/30"
+              >
+                Scarica le ricette gratuite
+                <ArrowRight size={18} />
+              </a>
+            </div>
           </div>
         </div>
       </div>

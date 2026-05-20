@@ -61,6 +61,9 @@ export default function Hero() {
             <a href="#servizi" className="btn-outline text-base">
               Scopri i servizi
             </a>
+            <a href="/ricette" className="inline-flex items-center gap-2 text-brand-300 hover:text-brand-200 font-medium text-base transition-colors">
+              📄 Ricette gratuite
+            </a>
           </div>
 
           {/* Stats row */}
