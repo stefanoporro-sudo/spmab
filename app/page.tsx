@@ -4,6 +4,7 @@ import Services from "@/components/Services";
 import About from "@/components/About";
 import WhySPMAB from "@/components/WhySPMAB";
 import CTA from "@/components/CTA";
+import Newsletter from "@/components/Newsletter";
 import ContactForm from "@/components/ContactForm";
 import Footer from "@/components/Footer";
 
@@ -16,6 +17,7 @@ export default function Home() {
       <About />
       <WhySPMAB />
       <CTA />
+      <Newsletter />
       <ContactForm />
       <Footer />
     </main>
