@@ -1,19 +1,120 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Script from "next/script";
+
+const siteUrl = "https://www.consulenzapizzaiolo.it";
 
 export const metadata: Metadata = {
-  title: "SPMAB | Consulenza Professionale per Panificazione e Ristorazione",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Consulenza Pizzaiolo | Stefano Porro - SPMAB",
+    template: "%s | Stefano Porro - SPMAB",
+  },
   description:
-    "Stefano Porro - SPMAB offre consulenza specializzata per Pizzaioli, Molini e Startup nel settore della panificazione e ristorazione artigianale. Trasforma la tua idea in un'impresa di successo.",
-  keywords:
-    "consulenza pizzeria, molino, panetteria, startup ristorazione, pizzaiolo professionista, SPMAB, Stefano Porro",
-  authors: [{ name: "Stefano Porro" }],
+    "Stefano Porro, consulente specializzato per pizzaioli, molini e startup nel settore della panificazione artigianale. Ricette professionali gratuite, formazione e supporto per aprire la tua pizzeria.",
+  keywords: [
+    "consulenza pizzaiolo",
+    "consulente pizzeria",
+    "aprire pizzeria",
+    "consulenza panificazione",
+    "formazione pizzaiolo",
+    "molino consulenza",
+    "startup pizzeria",
+    "ricette pizza professionali",
+    "pizza tonda romana",
+    "pizza napoletana",
+    "panificazione artigianale",
+    "Stefano Porro",
+    "SPMAB",
+  ],
+  authors: [{ name: "Stefano Porro", url: siteUrl }],
+  creator: "Stefano Porro",
+  publisher: "SPMAB",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   openGraph: {
-    title: "SPMAB | Consulenza Professionale per Panificazione e Ristorazione",
+    title: "Consulenza Pizzaiolo | Stefano Porro - SPMAB",
     description:
-      "Trasforma la tua passione in un'impresa. Consulenza specializzata per pizzaioli, molini e startup nel food artisan.",
+      "Consulenza specializzata per pizzaioli, molini e startup. Trasforma la tua passione in un'impresa di successo. Ricette professionali gratuite.",
+    url: siteUrl,
+    siteName: "SPMAB - Consulenza Pizzaiolo",
     type: "website",
     locale: "it_IT",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Consulenza Pizzaiolo | Stefano Porro - SPMAB",
+    description:
+      "Consulenza specializzata per pizzaioli, molini e startup nel settore della panificazione artigianale.",
+  },
+  alternates: {
+    canonical: siteUrl,
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ProfessionalService",
+  name: "SPMAB - Consulenza Pizzaiolo",
+  description:
+    "Consulenza professionale per pizzaioli, molini e startup nel settore della panificazione e ristorazione artigianale.",
+  url: siteUrl,
+  founder: {
+    "@type": "Person",
+    name: "Stefano Porro",
+    jobTitle: "Consulente Specializzato Pizzeria e Panificazione",
+  },
+  areaServed: {
+    "@type": "Country",
+    name: "Italia",
+  },
+  serviceType: [
+    "Consulenza Pizzeria",
+    "Formazione Pizzaiolo",
+    "Consulenza Molini",
+    "Startup Ristorazione",
+    "Panificazione Artigianale",
+  ],
+  telephone: "+393933602014",
+  email: "porroste80@gmail.com",
+  priceRange: "€€",
+  hasOfferCatalog: {
+    "@type": "OfferCatalog",
+    name: "Servizi di Consulenza",
+    itemListElement: [
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Consulenza per Pizzaioli",
+          description: "Supporto tecnico e strategico per pizzaioli professionisti",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Consulenza per Molini",
+          description: "Analisi e ottimizzazione per mulini e produttori di farine",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Startup Pizzeria",
+          description: "Supporto completo per aprire una pizzeria o panetteria",
+        },
+      },
+    ],
   },
 };
 
@@ -24,7 +125,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="it" className="noise">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Script
+          id="json-ld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </body>
     </html>
   );
 }
