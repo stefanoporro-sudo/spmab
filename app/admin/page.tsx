@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Users, Lock, LogOut, Download, Search, RefreshCw,
-  ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight,
+  ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, FileText,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -29,7 +29,18 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [tab, setTab] = useState<"iscritti" | "ricette">("iscritti");
+  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf">("iscritti");
+
+  // ── PDF Generator state ──
+  const [logoBase64, setLogoBase64] = useState<string>("");
+  const [pdfForm, setPdfForm] = useState({
+    title: "",
+    category: "Pizza",
+    level: "Base",
+    ingredienti: "",
+    procedimento: "",
+    note: "",
+  });
 
   // ── Subscribers state ──
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -152,6 +163,98 @@ setAuthenticated(true);
     a.click();
   };
 
+  // ── Logo upload ──────────────────────────────────────────────────
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setLogoBase64(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // ── Generate PDF ─────────────────────────────────────────────────
+  const generatePDF = () => {
+    const logoHtml = logoBase64
+      ? `<img src="${logoBase64}" style="height:60px;max-width:160px;object-fit:contain;" />`
+      : `<div style="font-size:28px;font-weight:900;color:#d47e28;letter-spacing:-1px;">SPMAB</div>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8"/>
+  <title>${pdfForm.title} — SPMAB</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',sans-serif;color:#1a1a1a;background:#fff;padding:40px 48px;}
+    .header{display:flex;justify-content:space-between;align-items:center;padding-bottom:20px;border-bottom:3px solid #d47e28;margin-bottom:28px;}
+    .header-right{text-align:right;font-size:12px;color:#555;line-height:1.8;}
+    .header-right strong{color:#d47e28;font-size:13px;}
+    .badges{display:flex;gap:10px;margin-bottom:20px;}
+    .badge{background:#fff4e6;color:#b85c00;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;border:1px solid #fcd38d;}
+    h1{font-size:30px;font-weight:900;color:#1a1a1a;margin-bottom:6px;letter-spacing:-0.5px;}
+    .divider{height:1px;background:#f0e0c8;margin:24px 0;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:24px;}
+    .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#d47e28;margin-bottom:12px;}
+    .content{font-size:13px;line-height:1.9;color:#333;white-space:pre-wrap;}
+    .note-box{background:#fffbf5;border:1px solid #fcd38d;border-radius:10px;padding:16px 20px;margin-top:8px;}
+    .note-box .content{font-size:12.5px;color:#555;}
+    .footer{margin-top:32px;padding-top:16px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#999;}
+    .footer strong{color:#d47e28;}
+    @media print{body{padding:30px 36px;}@page{margin:0;size:A4;}}
+  </style>
+</head>
+<body>
+  <div class="header">
+    ${logoHtml}
+    <div class="header-right">
+      <strong>Stefano Porro — SPMAB</strong><br/>
+      Consulenza Pizzaiolo & Panificazione<br/>
+      +39 393 360 2014<br/>
+      consulenzapizzaiolo.it
+    </div>
+  </div>
+
+  <div class="badges">
+    <span class="badge">${pdfForm.category}</span>
+    <span class="badge">${pdfForm.level}</span>
+  </div>
+
+  <h1>${pdfForm.title}</h1>
+  <div class="divider"></div>
+
+  <div class="grid">
+    <div>
+      <div class="section-title">Ingredienti</div>
+      <div class="content">${pdfForm.ingredienti || "—"}</div>
+    </div>
+    <div>
+      <div class="section-title">Procedimento</div>
+      <div class="content">${pdfForm.procedimento || "—"}</div>
+    </div>
+  </div>
+
+  ${pdfForm.note ? `
+  <div class="divider"></div>
+  <div class="section-title">Note del Maestro</div>
+  <div class="note-box">
+    <div class="content">${pdfForm.note}</div>
+  </div>` : ""}
+
+  <div class="footer">
+    <span>© ${new Date().getFullYear()} SPMAB — Stefano Porro</span>
+    <span><strong>consulenzapizzaiolo.it</strong> · porroste80@gmail.com</span>
+  </div>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 600);
+  };
+
   const filteredSubs = subscribers.filter(
     (s) => s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase())
   );
@@ -210,7 +313,7 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette"] as const).map((t) => (
+              {(["iscritti", "ricette", "pdf"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -220,8 +323,8 @@ setAuthenticated(true);
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  {t === "iscritti" ? <Users size={14} /> : <ChefHat size={14} />}
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t === "iscritti" ? <Users size={14} /> : t === "ricette" ? <ChefHat size={14} /> : <FileText size={14} />}
+                  {t === "iscritti" ? "Iscritti" : t === "ricette" ? "Ricette" : "Crea PDF"}
                 </button>
               ))}
             </div>
@@ -367,6 +470,115 @@ setAuthenticated(true);
             )}
           </>
         )}
+        {/* ══ TAB: PDF ══════════════════════════════════════════════ */}
+        {tab === "pdf" && (
+          <div className="max-w-3xl">
+            <div className="mb-8">
+              <h2 className="text-white font-semibold text-lg">Crea PDF Ricetta</h2>
+              <p className="text-gray-500 text-sm">Compila i campi e genera un PDF professionale con il tuo logo.</p>
+            </div>
+
+            <div className="flex flex-col gap-5">
+              {/* Logo upload */}
+              <div className="card">
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-3">Logo (PNG/JPG)</p>
+                <div className="flex items-center gap-4">
+                  {logoBase64 && (
+                    <img src={logoBase64} alt="Logo" className="h-14 object-contain rounded-lg bg-white p-1" />
+                  )}
+                  <label className="cursor-pointer inline-flex items-center gap-2 bg-dark-700 hover:bg-dark-600 border border-dark-500 text-gray-300 px-4 py-2.5 rounded-xl text-sm transition-colors">
+                    <Download size={14} />
+                    {logoBase64 ? "Cambia logo" : "Carica logo"}
+                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                  </label>
+                  {!logoBase64 && <p className="text-gray-600 text-xs">Se non carichi il logo verrà usato il testo SPMAB</p>}
+                </div>
+              </div>
+
+              {/* Title + meta */}
+              <div className="card flex flex-col gap-4">
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Nome Ricetta *</label>
+                  <input
+                    type="text" value={pdfForm.title}
+                    onChange={(e) => setPdfForm({ ...pdfForm, title: e.target.value })}
+                    placeholder="Es. Pizza Tonda Romana"
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Categoria</label>
+                    <select
+                      value={pdfForm.category}
+                      onChange={(e) => setPdfForm({ ...pdfForm, category: e.target.value })}
+                      className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                    >
+                      {CATEGORIES.map((c) => <option key={c} value={c} className="bg-dark-700">{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Livello</label>
+                    <select
+                      value={pdfForm.level}
+                      onChange={(e) => setPdfForm({ ...pdfForm, level: e.target.value })}
+                      className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                    >
+                      {LEVELS.map((l) => <option key={l} value={l} className="bg-dark-700">{l}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ingredienti + Procedimento */}
+              <div className="grid sm:grid-cols-2 gap-5">
+                <div className="card">
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Ingredienti</label>
+                  <textarea
+                    rows={10} value={pdfForm.ingredienti}
+                    onChange={(e) => setPdfForm({ ...pdfForm, ingredienti: e.target.value })}
+                    placeholder={"Farina 00  500g\nAcqua  325g\nSale  12g\nLievito  2g\n..."}
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm resize-none font-mono"
+                  />
+                </div>
+                <div className="card">
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Procedimento</label>
+                  <textarea
+                    rows={10} value={pdfForm.procedimento}
+                    onChange={(e) => setPdfForm({ ...pdfForm, procedimento: e.target.value })}
+                    placeholder={"1. Sciogliere il lievito...\n2. Aggiungere la farina...\n3. Impastare per 10 min...\n..."}
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Note */}
+              <div className="card">
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Note del Maestro (opzionale)</label>
+                <textarea
+                  rows={3} value={pdfForm.note}
+                  onChange={(e) => setPdfForm({ ...pdfForm, note: e.target.value })}
+                  placeholder="Consigli, varianti, temperature ideali..."
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm resize-none"
+                />
+              </div>
+
+              {/* Generate button */}
+              <button
+                onClick={generatePDF}
+                disabled={!pdfForm.title.trim()}
+                className="btn-primary justify-center py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                <FileText size={18} />
+                Genera e Scarica PDF
+              </button>
+              <p className="text-gray-600 text-xs text-center -mt-2">
+                Si aprirà una finestra di stampa — seleziona &quot;Salva come PDF&quot; come stampante.
+              </p>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* ══ RECIPE FORM MODAL ════════════════════════════════════════ */}
