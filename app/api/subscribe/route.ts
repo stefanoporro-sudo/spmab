@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 async function sendEmails(name: string, email: string) {
   const resendKey = process.env.RESEND_API_KEY;
   const adminEmail = process.env.ADMIN_EMAIL ?? "stefano@consulenzapizzaiolo.it";
-  const fromEmail = process.env.FROM_EMAIL ?? "noreply@spmab.it";
+  const fromEmail = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
 
   if (!resendKey) return;
 
@@ -61,7 +61,7 @@ async function sendEmails(name: string, email: string) {
           <h2 style="color:#d47e28;">Ciao ${name}, benvenuto/a in SPMAB!</h2>
           <p>Grazie per esserti iscritto/a. Le tue ricette professionali sono ora disponibili per il download.</p>
           <p>
-            <a href="https://spmab.vercel.app/ricette"
+            <a href="https://consulenzapizzaiolo.it/ricette"
                style="display:inline-block;background:#d47e28;color:white;padding:12px 28px;border-radius:24px;text-decoration:none;font-weight:bold;">
               Scarica le ricette →
             </a>
@@ -69,7 +69,7 @@ async function sendEmails(name: string, email: string) {
           <p style="margin-top:24px;color:#555;">
             Hai domande o vuoi una consulenza gratuita?<br>
             Rispondi a questa email o contattami su:
-            <a href="https://spmab.vercel.app/#contatti" style="color:#d47e28;">spmab.vercel.app</a>
+            <a href="https://consulenzapizzaiolo.it/#contatti" style="color:#d47e28;">consulenzapizzaiolo.it</a>
           </p>
           <p style="margin-top:32px;color:#888;font-size:12px;">
             — Stefano Porro, SPMAB<br>
