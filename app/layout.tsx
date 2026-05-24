@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Script from "next/script";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
 const siteUrl = "https://www.consulenzapizzaiolo.it";
 
@@ -127,6 +128,7 @@ export default function RootLayout({
     <html lang="it" className="noise">
       <body>
         {children}
+        <WhatsAppButton />
         <Script
           id="json-ld"
           type="application/ld+json"
