@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 async function sendEmails(name: string, email: string) {
   const resendKey = process.env.RESEND_API_KEY;
-  const adminEmail = process.env.ADMIN_EMAIL ?? "porroste80@gmail.com";
+  const adminEmail = process.env.ADMIN_EMAIL ?? "stefano@consulenzapizzaiolo.it";
   const fromEmail = process.env.FROM_EMAIL ?? "noreply@spmab.it";
 
   if (!resendKey) return;

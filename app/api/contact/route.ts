@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   }
 
   const resendKey = process.env.RESEND_API_KEY;
-  const adminEmail = process.env.ADMIN_EMAIL ?? "porroste80@gmail.com";
+  const adminEmail = process.env.ADMIN_EMAIL ?? "stefano@consulenzapizzaiolo.it";
   const fromEmail = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
 
   if (!resendKey) {

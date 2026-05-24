@@ -84,7 +84,7 @@ const jsonLd = {
     "Panificazione Artigianale",
   ],
   telephone: "+393933602014",
-  email: "porroste80@gmail.com",
+  email: "stefano@consulenzapizzaiolo.it",
   priceRange: "€€",
   hasOfferCatalog: {
     "@type": "OfferCatalog",

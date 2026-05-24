@@ -7,8 +7,8 @@ const contactInfo = [
   {
     icon: Mail,
     label: "Email",
-    value: "porroste80@gmail.com",
-    href: "mailto:porroste80@gmail.com",
+    value: "stefano@consulenzapizzaiolo.it",
+    href: "mailto:stefano@consulenzapizzaiolo.it",
   },
   {
     icon: Phone,
@@ -62,7 +62,7 @@ export default function ContactForm() {
     if (res.ok) {
       setSent(true);
     } else {
-      alert("Errore nell'invio. Riprova o scrivici direttamente a porroste80@gmail.com");
+      alert("Errore nell'invio. Riprova o scrivici direttamente a stefano@consulenzapizzaiolo.it");
     }
   };
 

@@ -245,7 +245,7 @@ setAuthenticated(true);
 
   <div class="footer">
     <span>© ${new Date().getFullYear()} SPMAB — Stefano Porro</span>
-    <span><strong>consulenzapizzaiolo.it</strong> · porroste80@gmail.com</span>
+    <span><strong>consulenzapizzaiolo.it</strong> · stefano@consulenzapizzaiolo.it</span>
   </div>
 </body>
 </html>`;
