@@ -32,7 +32,6 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf">("iscritti");
 
   // ── PDF Generator state ──
-  const [logoBase64, setLogoBase64] = useState<string>("");
   const [pdfForm, setPdfForm] = useState({
     title: "",
     category: "Pizza",
@@ -41,6 +40,10 @@ export default function AdminPage() {
     procedimento: "",
     note: "",
   });
+  const [pdfFiles, setPdfFiles] = useState<{ name: string; url: string }[]>([]);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [savingToDB, setSavingToDB] = useState(false);
+  const [savedToDB, setSavedToDB] = useState(false);
 
   // ── Subscribers state ──
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -89,9 +92,17 @@ setAuthenticated(true);
     setRecipesLoading(false);
   }, [password]);
 
+  // ── Fetch PDF files ──────────────────────────────────────────────
+  const fetchPdfFiles = useCallback(async () => {
+    const res = await fetch("/api/pdf-files", { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setPdfFiles(data.files ?? []);
+  }, [password]);
+
   useEffect(() => {
-    if (authenticated && tab === "ricette") fetchRecipes();
-  }, [authenticated, tab, fetchRecipes]);
+    if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); }
+    if (authenticated && tab === "pdf") fetchPdfFiles();
+  }, [authenticated, tab, fetchRecipes, fetchPdfFiles]);
 
   // ── Recipe form helpers ──────────────────────────────────────────
   const openNewRecipe = () => {
@@ -163,21 +174,9 @@ setAuthenticated(true);
     a.click();
   };
 
-  // ── Logo upload ──────────────────────────────────────────────────
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setLogoBase64(ev.target?.result as string);
-    reader.readAsDataURL(file);
-  };
-
   // ── Generate PDF ─────────────────────────────────────────────────
   const generatePDF = () => {
-    const logoHtml = logoBase64
-      ? `<img src="${logoBase64}" style="height:60px;max-width:160px;object-fit:contain;" />`
-      : `<div style="font-size:28px;font-weight:900;color:#d47e28;letter-spacing:-1px;">SPMAB</div>`;
-
+    const logoUrl = `${window.location.origin}/logo.png`;
     const html = `<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -194,9 +193,10 @@ setAuthenticated(true);
     .badge{background:#fff4e6;color:#b85c00;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;border:1px solid #fcd38d;}
     h1{font-size:30px;font-weight:900;color:#1a1a1a;margin-bottom:6px;letter-spacing:-0.5px;}
     .divider{height:1px;background:#f0e0c8;margin:24px 0;}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:24px;}
+    .grid{display:grid;grid-template-columns:35% 65%;gap:32px;margin-bottom:24px;}
     .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#d47e28;margin-bottom:12px;}
     .content{font-size:13px;line-height:1.9;color:#333;white-space:pre-wrap;}
+    .ingredienti-box{background:#fafafa;border:1px solid #f0e0c8;border-radius:10px;padding:16px;}
     .note-box{background:#fffbf5;border:1px solid #fcd38d;border-radius:10px;padding:16px 20px;margin-top:8px;}
     .note-box .content{font-size:12.5px;color:#555;}
     .footer{margin-top:32px;padding-top:16px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#999;}
@@ -206,7 +206,7 @@ setAuthenticated(true);
 </head>
 <body>
   <div class="header">
-    ${logoHtml}
+    <img src="${logoUrl}" style="height:60px;max-width:160px;object-fit:contain;" />
     <div class="header-right">
       <strong>Stefano Porro — SPMAB</strong><br/>
       Consulenza Pizzaiolo & Panificazione<br/>
@@ -226,7 +226,9 @@ setAuthenticated(true);
   <div class="grid">
     <div>
       <div class="section-title">Ingredienti</div>
-      <div class="content">${pdfForm.ingredienti || "—"}</div>
+      <div class="ingredienti-box">
+        <div class="content">${pdfForm.ingredienti || "—"}</div>
+      </div>
     </div>
     <div>
       <div class="section-title">Procedimento</div>
@@ -252,7 +254,47 @@ setAuthenticated(true);
     if (!win) return;
     win.document.write(html);
     win.document.close();
-    setTimeout(() => win.print(), 600);
+    setTimeout(() => win.print(), 800);
+  };
+
+  // ── Save recipe to DB ────────────────────────────────────────────
+  const saveRecipeToDB = async () => {
+    if (!pdfForm.title.trim()) return;
+    setSavingToDB(true);
+    await fetch("/api/recipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({
+        title: pdfForm.title,
+        category: pdfForm.category,
+        level: pdfForm.level,
+        description: "",
+        file_url: "",
+        active: false,
+        sort_order: 99,
+      }),
+    });
+    setSavingToDB(false);
+    setSavedToDB(true);
+    fetchRecipes();
+    setTimeout(() => setSavedToDB(false), 3000);
+  };
+
+  // ── Upload PDF to Supabase Storage ───────────────────────────────
+  const uploadPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPdf(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    await fetch("/api/pdf-files", {
+      method: "POST",
+      headers: { "x-admin-password": password },
+      body: formData,
+    });
+    setUploadingPdf(false);
+    fetchPdfFiles();
+    e.target.value = "";
   };
 
   const filteredSubs = subscribers.filter(
@@ -479,20 +521,28 @@ setAuthenticated(true);
             </div>
 
             <div className="flex flex-col gap-5">
-              {/* Logo upload */}
+              {/* Upload PDF */}
               <div className="card">
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-3">Logo (PNG/JPG)</p>
-                <div className="flex items-center gap-4">
-                  {logoBase64 && (
-                    <img src={logoBase64} alt="Logo" className="h-14 object-contain rounded-lg bg-white p-1" />
-                  )}
-                  <label className="cursor-pointer inline-flex items-center gap-2 bg-dark-700 hover:bg-dark-600 border border-dark-500 text-gray-300 px-4 py-2.5 rounded-xl text-sm transition-colors">
-                    <Download size={14} />
-                    {logoBase64 ? "Cambia logo" : "Carica logo"}
-                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-3">Carica PDF nel sistema</p>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <label className="cursor-pointer inline-flex items-center gap-2 bg-brand-500/15 hover:bg-brand-500/25 border border-brand-500/30 text-brand-300 px-4 py-2.5 rounded-xl text-sm transition-colors">
+                    {uploadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                    {uploadingPdf ? "Caricamento..." : "Carica PDF"}
+                    <input type="file" accept=".pdf" onChange={uploadPdf} className="hidden" disabled={uploadingPdf} />
                   </label>
-                  {!logoBase64 && <p className="text-gray-600 text-xs">Se non carichi il logo verrà usato il testo SPMAB</p>}
+                  {pdfFiles.length > 0 && (
+                    <span className="text-gray-500 text-xs">{pdfFiles.length} PDF disponibili nel sistema</span>
+                  )}
                 </div>
+                {pdfFiles.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {pdfFiles.map(f => (
+                      <span key={f.url} className="text-xs bg-dark-700 text-gray-400 px-3 py-1 rounded-full border border-dark-500">
+                        📄 {f.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Title + meta */}
@@ -563,17 +613,27 @@ setAuthenticated(true);
                 />
               </div>
 
-              {/* Generate button */}
-              <button
-                onClick={generatePDF}
-                disabled={!pdfForm.title.trim()}
-                className="btn-primary justify-center py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                <FileText size={18} />
-                Genera e Scarica PDF
-              </button>
+              {/* Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={generatePDF}
+                  disabled={!pdfForm.title.trim()}
+                  className="btn-primary justify-center py-4 text-base flex-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  <FileText size={18} />
+                  Genera e Scarica PDF
+                </button>
+                <button
+                  onClick={saveRecipeToDB}
+                  disabled={!pdfForm.title.trim() || savingToDB || savedToDB}
+                  className="flex-1 inline-flex items-center justify-center gap-2 border border-brand-500/40 text-brand-300 hover:bg-brand-500/10 font-semibold px-6 py-4 rounded-full transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingToDB ? <Loader2 size={18} className="animate-spin" /> : savedToDB ? <Check size={18} className="text-green-400" /> : <Plus size={18} />}
+                  {savedToDB ? "Salvata nel pannello!" : "Salva nel pannello ricette"}
+                </button>
+              </div>
               <p className="text-gray-600 text-xs text-center -mt-2">
-                Si aprirà una finestra di stampa — seleziona &quot;Salva come PDF&quot; come stampante.
+                &quot;Genera PDF&quot; apre la stampa → seleziona &quot;Salva come PDF&quot;. &quot;Salva nel pannello&quot; aggiunge la ricetta alla scheda Ricette.
               </p>
             </div>
           </div>
@@ -639,14 +699,29 @@ setAuthenticated(true);
               </div>
 
               <div>
-                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Link PDF</label>
-                <input
-                  type="url" value={recipeForm.file_url}
-                  onChange={(e) => setRecipeForm({ ...recipeForm, file_url: e.target.value })}
-                  placeholder="https://... oppure /ricette/nome-file.pdf"
-                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm"
-                />
-                <p className="text-gray-600 text-xs mt-1.5">Incolla il link diretto al PDF (puoi usare Google Drive, Dropbox o caricare su GitHub)</p>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">File PDF</label>
+                {pdfFiles.length > 0 ? (
+                  <select
+                    value={recipeForm.file_url}
+                    onChange={(e) => setRecipeForm({ ...recipeForm, file_url: e.target.value })}
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                  >
+                    <option value="" className="bg-dark-700">— Seleziona un PDF —</option>
+                    {pdfFiles.map(f => (
+                      <option key={f.url} value={f.url} className="bg-dark-700">📄 {f.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="url" value={recipeForm.file_url}
+                    onChange={(e) => setRecipeForm({ ...recipeForm, file_url: e.target.value })}
+                    placeholder="https://... (nessun PDF caricato nel sistema)"
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                  />
+                )}
+                <p className="text-gray-600 text-xs mt-1.5">
+                  {pdfFiles.length > 0 ? "Scegli il PDF dalla scheda \"Crea PDF\"" : "Carica prima un PDF dalla scheda \"Crea PDF\""}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
