@@ -84,6 +84,7 @@ export default function AdminPage() {
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [postError, setPostError] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [deletingPdf, setDeletingPdf] = useState<string | null>(null);
 
   // ── Testimonials state ───────────────────────────────────────────
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -152,6 +153,19 @@ setAuthenticated(true);
     setPosts(data.posts ?? []);
     setPostsLoading(false);
   }, [password]);
+
+  // ── Delete PDF ───────────────────────────────────────────────────
+  const deletePdf = async (name: string) => {
+    if (!confirm(`Eliminare il file "${name}"?`)) return;
+    setDeletingPdf(name);
+    await fetch("/api/pdf-files", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ name }),
+    });
+    setDeletingPdf(null);
+    fetchPdfFiles();
+  };
 
   // ── Fetch testimonials ───────────────────────────────────────────
   const fetchTestimonials = useCallback(async () => {
@@ -702,11 +716,25 @@ setAuthenticated(true);
                   )}
                 </div>
                 {pdfFiles.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-col gap-2">
                     {pdfFiles.map(f => (
-                      <span key={f.url} className="text-xs bg-dark-700 text-gray-400 px-3 py-1 rounded-full border border-dark-500">
-                        📄 {f.name}
-                      </span>
+                      <div key={f.url} className="flex items-center justify-between bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-gray-500 flex-shrink-0">📄</span>
+                          <a href={f.url} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-gray-300 hover:text-brand-300 transition-colors truncate">
+                            {f.name}
+                          </a>
+                        </div>
+                        <button
+                          onClick={() => deletePdf(f.name)}
+                          disabled={deletingPdf === f.name}
+                          className="flex-shrink-0 ml-3 w-7 h-7 rounded-lg bg-dark-600 hover:bg-red-500/20 text-gray-500 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-50"
+                          title="Elimina PDF"
+                        >
+                          {deletingPdf === f.name ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
