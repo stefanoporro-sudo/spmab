@@ -45,7 +45,7 @@ export default function RicettePage() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
               <span className="text-white font-display font-bold text-sm">S</span>
             </div>
-            <span className="font-display font-bold text-white">SPMAB</span>
+            <span className="font-display font-bold text-white">Consulenza Pizzaiolo</span>
           </div>
         </div>
       </div>
