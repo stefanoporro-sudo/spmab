@@ -215,14 +215,19 @@ export default function Services() {
                 </div>
               </div>
 
-              {/* Right: Price card */}
+              {/* Right: CTA card */}
               <div className="lg:w-72 w-full shrink-0">
                 <div className="bg-dark-900 border border-brand-500/50 rounded-2xl p-7 text-center shadow-2xl shadow-brand-500/10">
-                  <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">A partire da</div>
-                  <div className="font-display text-5xl font-bold text-white mb-1">
-                    450<span className="text-brand-400">€</span>
+                  <div className="w-14 h-14 rounded-2xl bg-brand-500/15 flex items-center justify-center mx-auto mb-5">
+                    <UtensilsCrossed className="text-brand-400 w-7 h-7" />
                   </div>
-                  <div className="text-gray-500 text-sm mb-6">per serata · max 25 persone</div>
+
+                  <div className="text-white font-display font-bold text-xl mb-2">
+                    Disponibilità limitata
+                  </div>
+                  <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                    Le date si esauriscono in anticipo. Contattami per verificare la disponibilità e ricevere un preventivo personalizzato.
+                  </p>
 
                   <div className="space-y-2.5 text-sm text-left mb-7">
                     {[
@@ -246,7 +251,7 @@ export default function Services() {
                     rel="noopener noreferrer"
                     className="w-full inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-bold px-6 py-3.5 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-500/30 text-sm"
                   >
-                    Verifica disponibilità
+                    Richiedi disponibilità
                     <ArrowRight size={15} />
                   </a>
                   <p className="text-gray-600 text-xs mt-3">Via WhatsApp · risposta rapida</p>
