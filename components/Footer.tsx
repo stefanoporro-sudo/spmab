@@ -17,6 +17,7 @@ const footerLinks = [
   { label: "Blog", href: "/blog" },
   { label: "Ricette", href: "/ricette" },
   { label: "Consulenza Molini", href: "/consulenza-molini" },
+  { label: "Consulenza Pizzaioli", href: "/consulenza-pizzaioli" },
 ];
 
 export default function Footer() {
