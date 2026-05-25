@@ -338,7 +338,7 @@ setAuthenticated(true);
 <html lang="it">
 <head>
   <meta charset="UTF-8"/>
-  <title>${pdfForm.title} — SPMAB</title>
+  <title>${pdfForm.title} — Consulenza Pizzaiolo</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -365,7 +365,7 @@ setAuthenticated(true);
   <div class="header">
     <img src="${logoUrl}" style="height:60px;max-width:160px;object-fit:contain;" />
     <div class="header-right">
-      <strong>Stefano Porro — SPMAB</strong><br/>
+      <strong>Stefano Porro — Consulenza Pizzaiolo</strong><br/>
       Consulenza Pizzaiolo & Panificazione<br/>
       +39 393 360 2014<br/>
       consulenzapizzaiolo.it
@@ -401,7 +401,7 @@ setAuthenticated(true);
   </div>` : ""}
 
   <div class="footer">
-    <span>© ${new Date().getFullYear()} SPMAB — Stefano Porro</span>
+    <span>© ${new Date().getFullYear()} Consulenza Pizzaiolo — Stefano Porro</span>
     <span><strong>consulenzapizzaiolo.it</strong> · stefano@consulenzapizzaiolo.it</span>
   </div>
 </body>
@@ -470,7 +470,7 @@ setAuthenticated(true);
               <Lock className="text-brand-400 w-6 h-6" />
             </div>
             <h1 className="font-display text-2xl font-bold text-white mb-1">Pannello Admin</h1>
-            <p className="text-gray-500 text-sm">SPMAB — Area riservata</p>
+            <p className="text-gray-500 text-sm">Consulenza Pizzaiolo — Area riservata</p>
           </div>
           <form onSubmit={handleLogin} className="bg-dark-800 border border-dark-600 rounded-2xl p-8 flex flex-col gap-5">
             <div>
@@ -508,7 +508,7 @@ setAuthenticated(true);
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
                 <span className="text-white font-display font-bold text-sm">S</span>
               </div>
-              <span className="text-white font-semibold text-sm hidden sm:block">SPMAB Admin</span>
+              <span className="text-white font-semibold text-sm hidden sm:block">Admin</span>
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
