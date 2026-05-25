@@ -30,7 +30,7 @@ export default function Header() {
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-3 group">
+        <a href="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg">
             <span className="text-white font-display font-bold text-lg leading-none">S</span>
           </div>
