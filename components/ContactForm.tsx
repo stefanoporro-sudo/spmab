@@ -111,6 +111,32 @@ export default function ContactForm() {
                 allora decidi come procedere.
               </p>
             </div>
+
+            {/* Google Reviews CTA */}
+            <a
+              href="https://g.page/r/CcUAIJZQfXUSEBM/review"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="card flex items-center gap-4 group hover:border-yellow-500/40 transition-all duration-300"
+            >
+              <div className="w-11 h-11 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0 group-hover:bg-yellow-500/20 transition-colors">
+                {/* Google star icon */}
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#FBBF24" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-white font-semibold text-sm group-hover:text-yellow-300 transition-colors">
+                  Lascia una recensione
+                </div>
+                <div className="text-gray-500 text-xs mt-0.5">
+                  Hai lavorato con me? Aiutami su Google ⭐
+                </div>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-600 group-hover:text-yellow-400 ml-auto transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
           </div>
 
           {/* Form */}
