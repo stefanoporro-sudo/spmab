@@ -884,8 +884,6 @@ setAuthenticated(true);
           </>
         )}
 
-      </div>
-
         {/* ══ TAB: RECENSIONI ═══════════════════════════════════════ */}
         {tab === "recensioni" && (
           <>
@@ -947,7 +945,7 @@ setAuthenticated(true);
           </>
         )}
 
-      </div>
+      </div>{/* fine max-w-6xl */}
 
       {/* ══ TESTIMONIAL FORM MODAL ═══════════════════════════════════ */}
       {showTestiForm && (
