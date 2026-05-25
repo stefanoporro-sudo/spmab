@@ -80,6 +80,7 @@ export default function AdminPage() {
   const [savingPost, setSavingPost] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [postError, setPostError] = useState("");
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   // ── Recipes state ──
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -921,17 +922,116 @@ setAuthenticated(true);
                 />
               </div>
 
-              {/* Cover URL */}
+              {/* Cover image upload */}
               <div>
                 <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">
-                  URL immagine copertina (opzionale)
+                  Immagine copertina (opzionale)
                 </label>
-                <input
-                  type="url" value={postForm.cover_url}
-                  onChange={(e) => setPostForm(f => ({ ...f, cover_url: e.target.value }))}
-                  placeholder="https://..."
-                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm"
-                />
+
+                {/* Anteprima immagine già caricata */}
+                {postForm.cover_url && (
+                  <div className="relative mb-3 rounded-xl overflow-hidden border border-dark-500 group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={postForm.cover_url}
+                      alt="Copertina"
+                      className="w-full h-36 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPostForm(f => ({ ...f, cover_url: "" }))}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-500/80 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                      title="Rimuovi immagine"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Bottone upload */}
+                {!postForm.cover_url && (
+                  <label className="cursor-pointer flex items-center justify-center gap-3 bg-dark-700 border border-dashed border-dark-400 hover:border-brand-500 rounded-xl px-4 py-5 transition-colors group">
+                    {uploadingCover ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin text-brand-400" />
+                        <span className="text-gray-400 text-sm">Caricamento in corso...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download size={18} className="text-gray-500 group-hover:text-brand-400 transition-colors" />
+                        <span className="text-gray-400 group-hover:text-gray-300 text-sm transition-colors">
+                          Clicca per caricare un&apos;immagine
+                        </span>
+                        <span className="text-gray-600 text-xs">JPG, PNG, WebP · max 5MB</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={uploadingCover}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingCover(true);
+                        setPostError("");
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        const res = await fetch("/api/blog/upload", {
+                          method: "POST",
+                          headers: { "x-admin-password": password },
+                          body: fd,
+                        });
+                        const data = await res.json();
+                        setUploadingCover(false);
+                        if (!res.ok) {
+                          setPostError(data.error ?? "Errore nel caricamento immagine.");
+                        } else {
+                          setPostForm(f => ({ ...f, cover_url: data.url }));
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+
+                {/* Cambia immagine già presente */}
+                {postForm.cover_url && (
+                  <label className="cursor-pointer inline-flex items-center gap-2 mt-2 text-xs text-gray-500 hover:text-brand-300 transition-colors">
+                    {uploadingCover ? (
+                      <><Loader2 size={12} className="animate-spin" /> Caricamento...</>
+                    ) : (
+                      <><Download size={12} /> Cambia immagine</>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={uploadingCover}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingCover(true);
+                        setPostError("");
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        const res = await fetch("/api/blog/upload", {
+                          method: "POST",
+                          headers: { "x-admin-password": password },
+                          body: fd,
+                        });
+                        const data = await res.json();
+                        setUploadingCover(false);
+                        if (!res.ok) {
+                          setPostError(data.error ?? "Errore nel caricamento immagine.");
+                        } else {
+                          setPostForm(f => ({ ...f, cover_url: data.url }));
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
               </div>
 
               {/* Contenuto */}
