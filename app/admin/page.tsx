@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Users, Lock, LogOut, Download, Search, RefreshCw,
   ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, FileText,
-  BookOpen, Eye, EyeOff,
+  BookOpen, Eye, EyeOff, Star,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -20,6 +20,8 @@ type Post = {
   category: string; cover_url: string; published: boolean; published_at: string; created_at: string;
 };
 type PostForm = Omit<Post, "id" | "published_at" | "created_at">;
+type Testimonial = { id: string; name: string; role: string; stars: number; text: string; active: boolean; sort_order: number };
+type TestimonialForm = Omit<Testimonial, "id">;
 
 const emptyRecipe: RecipeForm = {
   title: "", category: "Pizza", description: "", level: "Base",
@@ -30,6 +32,7 @@ const emptyPost: PostForm = {
   category: "Pizza", cover_url: "", published: false,
 };
 const POST_CATEGORIES = ["Pizza", "Panificazione", "Consulenza", "Business", "Generale"];
+const emptyTestimonial: TestimonialForm = { name: "", role: "", stars: 5, text: "", active: true, sort_order: 99 };
 
 function toSlug(title: string) {
   return title
@@ -50,7 +53,7 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog">("iscritti");
+  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni">("iscritti");
 
   // ── PDF Generator state ──
   const [pdfForm, setPdfForm] = useState({
@@ -81,6 +84,16 @@ export default function AdminPage() {
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [postError, setPostError] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
+
+  // ── Testimonials state ───────────────────────────────────────────
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testiLoading, setTestiLoading] = useState(false);
+  const [showTestiForm, setShowTestiForm] = useState(false);
+  const [editingTesti, setEditingTesti] = useState<Testimonial | null>(null);
+  const [testiForm, setTestiForm] = useState<TestimonialForm>(emptyTestimonial);
+  const [savingTesti, setSavingTesti] = useState(false);
+  const [deletingTestiId, setDeletingTestiId] = useState<string | null>(null);
+  const [testiError, setTestiError] = useState("");
 
   // ── Recipes state ──
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -140,11 +153,49 @@ setAuthenticated(true);
     setPostsLoading(false);
   }, [password]);
 
+  // ── Fetch testimonials ───────────────────────────────────────────
+  const fetchTestimonials = useCallback(async () => {
+    setTestiLoading(true);
+    const res = await fetch("/api/testimonials", { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setTestimonials(data.testimonials ?? []);
+    setTestiLoading(false);
+  }, [password]);
+
   useEffect(() => {
     if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); }
     if (authenticated && tab === "pdf") fetchPdfFiles();
     if (authenticated && tab === "blog") fetchPosts();
-  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts]);
+    if (authenticated && tab === "recensioni") fetchTestimonials();
+  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchTestimonials]);
+
+  // ── Testimonial helpers ──────────────────────────────────────────
+  const openNewTesti = () => { setEditingTesti(null); setTestiForm(emptyTestimonial); setTestiError(""); setShowTestiForm(true); };
+  const openEditTesti = (t: Testimonial) => {
+    setEditingTesti(t);
+    setTestiForm({ name: t.name, role: t.role, stars: t.stars, text: t.text, active: t.active, sort_order: t.sort_order });
+    setTestiError(""); setShowTestiForm(true);
+  };
+  const saveTesti = async () => {
+    if (!testiForm.name.trim() || !testiForm.text.trim()) { setTestiError("Nome e testo sono obbligatori."); return; }
+    setSavingTesti(true); setTestiError("");
+    const url = editingTesti ? `/api/testimonials/${editingTesti.id}` : "/api/testimonials";
+    const method = editingTesti ? "PUT" : "POST";
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json", "x-admin-password": password }, body: JSON.stringify(testiForm) });
+    setSavingTesti(false);
+    if (!res.ok) { setTestiError("Errore nel salvataggio."); return; }
+    setShowTestiForm(false); fetchTestimonials();
+  };
+  const deleteTesti = async (id: string) => {
+    if (!confirm("Eliminare questa recensione?")) return;
+    setDeletingTestiId(id);
+    await fetch(`/api/testimonials/${id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+    setDeletingTestiId(null); fetchTestimonials();
+  };
+  const toggleTesti = async (t: Testimonial) => {
+    await fetch(`/api/testimonials/${t.id}`, { method: "PUT", headers: { "Content-Type": "application/json", "x-admin-password": password }, body: JSON.stringify({ active: !t.active }) });
+    fetchTestimonials();
+  };
 
   // ── Post form helpers ─────────────────────────────────────────────
   const openNewPost = () => {
@@ -461,11 +512,11 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette", "pdf", "blog"] as const).map((t) => (
+              {(["iscritti", "ricette", "pdf", "blog", "recensioni"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     tab === t
                       ? "bg-brand-500 text-white shadow"
                       : "text-gray-400 hover:text-white"
@@ -474,11 +525,15 @@ setAuthenticated(true);
                   {t === "iscritti" ? <Users size={14} />
                     : t === "ricette" ? <ChefHat size={14} />
                     : t === "pdf" ? <FileText size={14} />
-                    : <BookOpen size={14} />}
-                  {t === "iscritti" ? "Iscritti"
-                    : t === "ricette" ? "Ricette"
-                    : t === "pdf" ? "Crea PDF"
-                    : "Blog"}
+                    : t === "blog" ? <BookOpen size={14} />
+                    : <Star size={14} />}
+                  <span className="hidden sm:inline">
+                    {t === "iscritti" ? "Iscritti"
+                      : t === "ricette" ? "Ricette"
+                      : t === "pdf" ? "PDF"
+                      : t === "blog" ? "Blog"
+                      : "Recensioni"}
+                  </span>
                 </button>
               ))}
             </div>
@@ -830,6 +885,142 @@ setAuthenticated(true);
         )}
 
       </div>
+
+        {/* ══ TAB: RECENSIONI ═══════════════════════════════════════ */}
+        {tab === "recensioni" && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-white font-semibold text-lg">Gestione Recensioni</h2>
+                <p className="text-gray-500 text-sm">
+                  {testimonials.filter(t => t.active).length} visibili · {testimonials.filter(t => !t.active).length} nascoste
+                </p>
+              </div>
+              <button onClick={openNewTesti} className="btn-primary text-sm px-5 py-2.5">
+                <Plus size={16} /> Nuova recensione
+              </button>
+            </div>
+
+            {testiLoading ? (
+              <div className="flex justify-center py-20"><Loader2 className="text-brand-400 w-7 h-7 animate-spin" /></div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {testimonials.length === 0 ? (
+                  <div className="bg-dark-800 border border-dark-600 rounded-2xl px-6 py-16 text-center text-gray-600 text-sm">
+                    Nessuna recensione. Clicca &quot;Nuova recensione&quot; per aggiungerne una.
+                  </div>
+                ) : (
+                  testimonials.map((t) => (
+                    <div key={t.id} className="bg-dark-800 border border-dark-600 rounded-2xl p-5 flex items-start gap-4 hover:bg-dark-700/40 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-white font-semibold text-sm">{t.name}</span>
+                          {t.role && <span className="text-gray-500 text-xs">· {t.role}</span>}
+                          <div className="flex gap-0.5 ml-1">
+                            {Array.from({ length: t.stars }).map((_, i) => (
+                              <Star key={i} size={11} className="text-yellow-400 fill-yellow-400" />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-gray-400 text-sm line-clamp-2">&ldquo;{t.text}&rdquo;</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button onClick={() => toggleTesti(t)} title={t.active ? "Visibile" : "Nascosta"}>
+                          {t.active ? <ToggleRight size={22} className="text-brand-400" /> : <ToggleLeft size={22} className="text-gray-600" />}
+                        </button>
+                        <button onClick={() => openEditTesti(t)} className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-brand-500/20 text-gray-400 hover:text-brand-300 flex items-center justify-center transition-colors">
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => deleteTesti(t.id)}
+                          disabled={deletingTestiId === t.id}
+                          className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-50"
+                        >
+                          {deletingTestiId === t.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+      </div>
+
+      {/* ══ TESTIMONIAL FORM MODAL ═══════════════════════════════════ */}
+      {showTestiForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-800 border border-dark-600 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-dark-700">
+              <h3 className="text-white font-semibold text-lg">
+                {editingTesti ? "Modifica recensione" : "Nuova recensione"}
+              </h3>
+              <button onClick={() => setShowTestiForm(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Nome *</label>
+                  <input type="text" value={testiForm.name} onChange={(e) => setTestiForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Mario Rossi"
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Ruolo</label>
+                  <input type="text" value={testiForm.role} onChange={(e) => setTestiForm(f => ({ ...f, role: e.target.value }))}
+                    placeholder="Es. Pizzaiolo, Local Guide..."
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Stelle</label>
+                <div className="flex gap-2">
+                  {[1,2,3,4,5].map(n => (
+                    <button key={n} type="button" onClick={() => setTestiForm(f => ({ ...f, stars: n }))}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${testiForm.stars >= n ? "bg-yellow-500/20 text-yellow-400" : "bg-dark-700 text-gray-600"}`}>
+                      <Star size={16} className={testiForm.stars >= n ? "fill-yellow-400" : ""} />
+                    </button>
+                  ))}
+                  <span className="text-gray-500 text-sm self-center ml-1">{testiForm.stars}/5</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Testo recensione *</label>
+                <textarea rows={4} value={testiForm.text} onChange={(e) => setTestiForm(f => ({ ...f, text: e.target.value }))}
+                  placeholder="Scrivi il testo della recensione..."
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Ordine</label>
+                  <input type="number" value={testiForm.sort_order} onChange={(e) => setTestiForm(f => ({ ...f, sort_order: Number(e.target.value) }))}
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Visibile</label>
+                  <button type="button" onClick={() => setTestiForm(f => ({ ...f, active: !f.active }))}
+                    className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-colors w-full ${testiForm.active ? "bg-brand-500/20 border-brand-500/40 text-brand-300" : "bg-dark-700 border-dark-500 text-gray-400"}`}>
+                    {testiForm.active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                    {testiForm.active ? "Visibile" : "Nascosta"}
+                  </button>
+                </div>
+              </div>
+              {testiError && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{testiError}</p>}
+            </div>
+            <div className="flex items-center gap-3 p-6 border-t border-dark-700">
+              <button onClick={() => setShowTestiForm(false)} className="flex-1 border border-dark-500 text-gray-300 hover:text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors">Annulla</button>
+              <button onClick={saveTesti} disabled={savingTesti} className="flex-1 btn-primary justify-center text-sm py-2.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100">
+                {savingTesti ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                {editingTesti ? "Salva modifiche" : "Aggiungi"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ POST FORM MODAL ══════════════════════════════════════════ */}
       {showPostForm && (
