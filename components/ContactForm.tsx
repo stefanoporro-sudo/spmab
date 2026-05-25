@@ -151,7 +151,7 @@ export default function ContactForm() {
                     Messaggio inviato!
                   </h3>
                   <p className="text-gray-400">
-                    Ti risponderemo entro 24 ore lavorative. Grazie per aver contattato SPMAB.
+                    Ti risponderemo entro 24 ore lavorative. Grazie per averci contattato!
                   </p>
                 </div>
               </div>

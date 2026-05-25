@@ -92,7 +92,7 @@ export default function Services() {
             <span className="gradient-text">un unico obiettivo.</span>
           </h2>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
-            SPMAB offre consulenza altamente specializzata in due ambiti distinti ma complementari
+            Consulenza altamente specializzata in due ambiti distinti ma complementari
             del mondo food artigianale italiano.
           </p>
         </div>

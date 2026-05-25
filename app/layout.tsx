@@ -8,8 +8,8 @@ const siteUrl = "https://www.consulenzapizzaiolo.it";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Consulenza Pizzaiolo | Stefano Porro - SPMAB",
-    template: "%s | Stefano Porro - SPMAB",
+    default: "Consulenza Pizzaiolo | Stefano Porro",
+    template: "%s | Consulenza Pizzaiolo",
   },
   description:
     "Stefano Porro, consulente specializzato per pizzaioli, molini e startup nel settore della panificazione artigianale. Ricette professionali gratuite, formazione e supporto per aprire la tua pizzeria.",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Stefano Porro", url: siteUrl }],
   creator: "Stefano Porro",
-  publisher: "SPMAB",
+  publisher: "Consulenza Pizzaiolo",
   robots: {
     index: true,
     follow: true,
@@ -42,17 +42,17 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Consulenza Pizzaiolo | Stefano Porro - SPMAB",
+    title: "Consulenza Pizzaiolo | Stefano Porro",
     description:
       "Consulenza specializzata per pizzaioli, molini e startup. Trasforma la tua passione in un'impresa di successo. Ricette professionali gratuite.",
     url: siteUrl,
-    siteName: "SPMAB - Consulenza Pizzaiolo",
+    siteName: "Consulenza Pizzaiolo — Stefano Porro",
     type: "website",
     locale: "it_IT",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Consulenza Pizzaiolo | Stefano Porro - SPMAB",
+    title: "Consulenza Pizzaiolo | Stefano Porro",
     description:
       "Consulenza specializzata per pizzaioli, molini e startup nel settore della panificazione artigianale.",
   },
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "ProfessionalService",
-  name: "SPMAB - Consulenza Pizzaiolo",
+  name: "Consulenza Pizzaiolo — Stefano Porro",
   description:
     "Consulenza professionale per pizzaioli, molini e startup nel settore della panificazione e ristorazione artigianale.",
   url: siteUrl,

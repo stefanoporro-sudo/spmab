@@ -11,7 +11,7 @@ const reasons = [
     icon: Shield,
     number: "02",
     title: "Riduci il rischio d'impresa",
-    desc: "Aprire un'attività comporta rischi. Con SPMAB analizzi mercato, costi e strategie prima di investire, evitando gli errori più comuni e costosi.",
+    desc: "Aprire un'attività comporta rischi. Con Consulenza Pizzaiolo analizzi mercato, costi e strategie prima di investire, evitando gli errori più comuni e costosi.",
   },
   {
     icon: BarChart3,
@@ -27,7 +27,7 @@ const reasons = [
   },
 ];
 
-export default function WhySPMAB() {
+export default function WhyConsulenza Pizzaiolo() {
   return (
     <section id="perche-spmab" className="py-28 bg-dark-900 relative overflow-hidden">
       {/* Background decoration */}
@@ -41,13 +41,13 @@ export default function WhySPMAB() {
           <div className="lg:sticky lg:top-32">
             <p className="section-subtitle mb-4">Perché Sceglierci</p>
             <h2 className="section-title text-white mb-6">
-              Perché SPMAB
+              Perché Consulenza Pizzaiolo
               <br />
               <span className="gradient-text">fa la differenza.</span>
             </h2>
             <p className="text-gray-400 text-lg leading-relaxed mb-8">
               In un mercato competitivo, avere al proprio fianco un consulente esperto può essere
-              la differenza tra il successo e il fallimento. Ecco perché i nostri clienti scelgono SPMAB.
+              la differenza tra il successo e il fallimento. Ecco perché i nostri clienti scelgono Consulenza Pizzaiolo.
             </p>
 
             {/* Testimonial highlight */}
@@ -58,7 +58,7 @@ export default function WhySPMAB() {
                 ))}
               </div>
               <p className="text-gray-300 italic leading-relaxed mb-4 text-sm">
-                &ldquo;Grazie a SPMAB ho trasformato la mia passione per la pizza in una pizzeria
+                &ldquo;Grazie a Consulenza Pizzaiolo ho trasformato la mia passione per la pizza in una pizzeria
                 avviata in soli 6 mesi. Stefano è stato fondamentale in ogni fase, dalla scelta
                 del locale all&apos;assunzione del personale.&rdquo;
               </p>

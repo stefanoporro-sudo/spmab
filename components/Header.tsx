@@ -36,7 +36,7 @@ export default function Header() {
           </div>
           <div>
             <div className="font-display font-bold text-xl text-white tracking-tight leading-none">
-              SPMAB
+              Consulenza Pizzaiolo
             </div>
             <div className="text-brand-400 text-xs font-medium tracking-widest uppercase leading-none mt-0.5">
               Stefano Porro

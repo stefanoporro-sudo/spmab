@@ -38,7 +38,7 @@ export default function About() {
               {/* Decorative placeholder */}
               <img
   src="/stefano.jpg"
-  alt="Stefano Porro - SPMAB"
+  alt="Stefano Porro - Consulenza Pizzaiolo"
   className="absolute inset-0 w-full h-full object-cover object-top"
 />
               {/* Floating badge */}
@@ -49,7 +49,7 @@ export default function About() {
                   </div>
                   <div>
                     <div className="text-white font-semibold text-sm">Stefano Porro</div>
-                    <div className="text-gray-400 text-xs">Fondatore & Consulente Senior SPMAB</div>
+                    <div className="text-gray-400 text-xs">Fondatore & Consulente Senior Consulenza Pizzaiolo</div>
                   </div>
                 </div>
               </div>
@@ -68,7 +68,7 @@ export default function About() {
               <span className="gradient-text">per ogni fase del tuo progetto.</span>
             </h2>
             <p className="text-gray-300 text-lg leading-relaxed mb-6">
-              Sono Stefano Porro, fondatore di SPMAB. Ho dedicato la mia carriera a supportare
+              Sono Stefano Porro, fondatore di Consulenza Pizzaiolo. Ho dedicato la mia carriera a supportare
               professionisti e imprenditori nel settore della panificazione e ristorazione artigianale,
               combinando competenza tecnica e visione imprenditoriale.
             </p>

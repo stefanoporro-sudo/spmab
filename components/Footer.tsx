@@ -3,7 +3,7 @@ import { Mail, Linkedin } from "lucide-react";
 const footerLinks = [
   { label: "Servizi", href: "/#servizi" },
   { label: "Chi Sono", href: "/#chi-sono" },
-  { label: "Perché SPMAB", href: "/#perche-spmab" },
+  { label: "Perché scegliermi", href: "/#perche-spmab" },
   { label: "Contatti", href: "/#contatti" },
   { label: "Blog", href: "/blog" },
   { label: "Ricette", href: "/ricette" },
@@ -22,7 +22,7 @@ export default function Footer() {
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
                 <span className="text-white font-display font-bold">S</span>
               </div>
-              <span className="font-display font-bold text-xl text-white">SPMAB</span>
+              <span className="font-display font-bold text-xl text-white">Consulenza Pizzaiolo</span>
             </div>
             <p className="text-gray-500 text-sm leading-relaxed max-w-xs">
               Consulenza professionale per Pizzaioli, Molini e Startup nel settore
@@ -75,7 +75,7 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="pt-8 border-t border-dark-700 flex flex-col sm:flex-row justify-between items-center gap-3 text-gray-600 text-xs">
-          <div>© {year} SPMAB — Stefano Porro. Tutti i diritti riservati.</div>
+          <div>© {year} Consulenza Pizzaiolo — Stefano Porro. Tutti i diritti riservati.</div>
           <div className="flex gap-5">
             <a href="#" className="hover:text-gray-400 transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-gray-400 transition-colors">Cookie Policy</a>
