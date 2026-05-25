@@ -27,7 +27,7 @@ const reasons = [
   },
 ];
 
-export default function WhyConsulenza Pizzaiolo() {
+export default function WhySPMAB() {
   return (
     <section id="perche-spmab" className="py-28 bg-dark-900 relative overflow-hidden">
       {/* Background decoration */}
