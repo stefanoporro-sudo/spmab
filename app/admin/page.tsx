@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Users, Lock, LogOut, Download, Search, RefreshCw,
   ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, FileText,
+  BookOpen, Eye, EyeOff,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -14,11 +15,31 @@ type Recipe = {
   level: string; file_url: string; active: boolean; sort_order: number;
 };
 type RecipeForm = Omit<Recipe, "id">;
+type Post = {
+  id: string; title: string; slug: string; excerpt: string; content: string;
+  category: string; cover_url: string; published: boolean; published_at: string; created_at: string;
+};
+type PostForm = Omit<Post, "id" | "published_at" | "created_at">;
 
 const emptyRecipe: RecipeForm = {
   title: "", category: "Pizza", description: "", level: "Base",
   file_url: "", active: true, sort_order: 99,
 };
+const emptyPost: PostForm = {
+  title: "", slug: "", excerpt: "", content: "",
+  category: "Pizza", cover_url: "", published: false,
+};
+const POST_CATEGORIES = ["Pizza", "Panificazione", "Consulenza", "Business", "Generale"];
+
+function toSlug(title: string) {
+  return title
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
 
 const CATEGORIES = ["Pizza", "Focaccia", "Pane", "Altro"];
 const LEVELS = ["Base", "Intermedio", "Avanzato"];
@@ -29,7 +50,7 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf">("iscritti");
+  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog">("iscritti");
 
   // ── PDF Generator state ──
   const [pdfForm, setPdfForm] = useState({
@@ -49,6 +70,16 @@ export default function AdminPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [subsLoading, setSubsLoading] = useState(false);
   const [search, setSearch] = useState("");
+
+  // ── Blog (Posts) state ──
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [showPostForm, setShowPostForm] = useState(false);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [postForm, setPostForm] = useState<PostForm>(emptyPost);
+  const [savingPost, setSavingPost] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+  const [postError, setPostError] = useState("");
 
   // ── Recipes state ──
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -99,10 +130,84 @@ setAuthenticated(true);
     setPdfFiles(data.files ?? []);
   }, [password]);
 
+  // ── Fetch posts ──────────────────────────────────────────────────
+  const fetchPosts = useCallback(async () => {
+    setPostsLoading(true);
+    const res = await fetch("/api/blog", { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setPosts(data.posts ?? []);
+    setPostsLoading(false);
+  }, [password]);
+
   useEffect(() => {
     if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); }
     if (authenticated && tab === "pdf") fetchPdfFiles();
-  }, [authenticated, tab, fetchRecipes, fetchPdfFiles]);
+    if (authenticated && tab === "blog") fetchPosts();
+  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts]);
+
+  // ── Post form helpers ─────────────────────────────────────────────
+  const openNewPost = () => {
+    setEditingPost(null);
+    setPostForm(emptyPost);
+    setPostError("");
+    setShowPostForm(true);
+  };
+
+  const openEditPost = (p: Post) => {
+    setEditingPost(p);
+    setPostForm({
+      title: p.title, slug: p.slug, excerpt: p.excerpt,
+      content: p.content, category: p.category,
+      cover_url: p.cover_url, published: p.published,
+    });
+    setPostError("");
+    setShowPostForm(true);
+  };
+
+  const savePost = async () => {
+    if (!postForm.title.trim()) { setPostError("Il titolo è obbligatorio."); return; }
+    if (!postForm.slug.trim()) { setPostError("Lo slug è obbligatorio."); return; }
+    setSavingPost(true);
+    setPostError("");
+
+    const url = editingPost ? `/api/blog/${editingPost.id}` : "/api/blog";
+    const method = editingPost ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify(postForm),
+    });
+
+    setSavingPost(false);
+    if (!res.ok) {
+      const data = await res.json();
+      setPostError(data.error ?? "Errore nel salvataggio. Riprova.");
+      return;
+    }
+    setShowPostForm(false);
+    fetchPosts();
+  };
+
+  const deletePost = async (id: string) => {
+    if (!confirm("Eliminare questo articolo?")) return;
+    setDeletingPostId(id);
+    await fetch(`/api/blog/${id}`, {
+      method: "DELETE",
+      headers: { "x-admin-password": password },
+    });
+    setDeletingPostId(null);
+    fetchPosts();
+  };
+
+  const togglePublished = async (p: Post) => {
+    await fetch(`/api/blog/${p.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ published: !p.published }),
+    });
+    fetchPosts();
+  };
 
   // ── Recipe form helpers ──────────────────────────────────────────
   const openNewRecipe = () => {
@@ -355,7 +460,7 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette", "pdf"] as const).map((t) => (
+              {(["iscritti", "ricette", "pdf", "blog"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -365,8 +470,14 @@ setAuthenticated(true);
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  {t === "iscritti" ? <Users size={14} /> : t === "ricette" ? <ChefHat size={14} /> : <FileText size={14} />}
-                  {t === "iscritti" ? "Iscritti" : t === "ricette" ? "Ricette" : "Crea PDF"}
+                  {t === "iscritti" ? <Users size={14} />
+                    : t === "ricette" ? <ChefHat size={14} />
+                    : t === "pdf" ? <FileText size={14} />
+                    : <BookOpen size={14} />}
+                  {t === "iscritti" ? "Iscritti"
+                    : t === "ricette" ? "Ricette"
+                    : t === "pdf" ? "Crea PDF"
+                    : "Blog"}
                 </button>
               ))}
             </div>
@@ -639,7 +750,226 @@ setAuthenticated(true);
           </div>
         )}
 
+        {/* ══ TAB: BLOG ═════════════════════════════════════════════ */}
+        {tab === "blog" && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-white font-semibold text-lg">Gestione Blog</h2>
+                <p className="text-gray-500 text-sm">
+                  {posts.filter(p => p.published).length} pubblicati · {posts.filter(p => !p.published).length} in bozza
+                </p>
+              </div>
+              <button onClick={openNewPost} className="btn-primary text-sm px-5 py-2.5">
+                <Plus size={16} /> Nuovo articolo
+              </button>
+            </div>
+
+            {postsLoading ? (
+              <div className="flex justify-center py-20"><Loader2 className="text-brand-400 w-7 h-7 animate-spin" /></div>
+            ) : (
+              <div className="bg-dark-800 border border-dark-600 rounded-2xl overflow-hidden">
+                <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_auto_auto] gap-4 px-6 py-3 border-b border-dark-700 text-gray-500 text-xs uppercase tracking-wide font-semibold">
+                  <div>Titolo</div><div>Categoria</div><div>Stato</div><div>Visibile</div><div>Azioni</div>
+                </div>
+
+                {posts.length === 0 ? (
+                  <div className="px-6 py-16 text-center text-gray-600 text-sm">
+                    Nessun articolo. Clicca &quot;Nuovo articolo&quot; per iniziare.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-dark-700">
+                    {posts.map((p) => (
+                      <div key={p.id} className="grid md:grid-cols-[2fr_1fr_1fr_auto_auto] gap-4 px-6 py-4 items-center hover:bg-dark-700/40 transition-colors">
+                        <div>
+                          <div className="text-white text-sm font-medium">{p.title}</div>
+                          <div className="text-gray-600 text-xs mt-0.5">/blog/{p.slug}</div>
+                        </div>
+                        <div className="text-gray-400 text-sm">{p.category}</div>
+                        <div>
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                            p.published
+                              ? "bg-green-500/15 text-green-300"
+                              : "bg-gray-500/15 text-gray-400"
+                          }`}>
+                            {p.published ? "Pubblicato" : "Bozza"}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => togglePublished(p)}
+                          className="text-gray-400 hover:text-brand-300 transition-colors"
+                          title={p.published ? "Pubblica → clicca per nascondere" : "Bozza → clicca per pubblicare"}
+                        >
+                          {p.published
+                            ? <Eye size={20} className="text-green-400" />
+                            : <EyeOff size={20} />}
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openEditPost(p)}
+                            className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-brand-500/20 text-gray-400 hover:text-brand-300 flex items-center justify-center transition-colors"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => deletePost(p.id)}
+                            disabled={deletingPostId === p.id}
+                            className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-50"
+                          >
+                            {deletingPostId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
       </div>
+
+      {/* ══ POST FORM MODAL ══════════════════════════════════════════ */}
+      {showPostForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-800 border border-dark-600 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-dark-700 flex-shrink-0">
+              <h3 className="text-white font-semibold text-lg">
+                {editingPost ? "Modifica articolo" : "Nuovo articolo"}
+              </h3>
+              <button onClick={() => setShowPostForm(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4 overflow-y-auto">
+              {/* Titolo */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Titolo *</label>
+                <input
+                  type="text" value={postForm.title}
+                  onChange={(e) => {
+                    const title = e.target.value;
+                    setPostForm(f => ({
+                      ...f,
+                      title,
+                      slug: editingPost ? f.slug : toSlug(title),
+                    }));
+                  }}
+                  placeholder="Es. Come scegliere la farina giusta per la pizza"
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  Slug (URL) *
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-sm flex-shrink-0">/blog/</span>
+                  <input
+                    type="text" value={postForm.slug}
+                    onChange={(e) => setPostForm(f => ({ ...f, slug: e.target.value }))}
+                    placeholder="come-scegliere-la-farina"
+                    className="flex-1 bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm font-mono"
+                  />
+                </div>
+                <p className="text-gray-600 text-xs mt-1.5">Auto-generato dal titolo. Puoi modificarlo.</p>
+              </div>
+
+              {/* Categoria + Pubblicato */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Categoria</label>
+                  <select
+                    value={postForm.category}
+                    onChange={(e) => setPostForm(f => ({ ...f, category: e.target.value }))}
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                  >
+                    {POST_CATEGORIES.map(c => <option key={c} value={c} className="bg-dark-700">{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Stato</label>
+                  <button
+                    type="button"
+                    onClick={() => setPostForm(f => ({ ...f, published: !f.published }))}
+                    className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-colors w-full ${
+                      postForm.published
+                        ? "bg-green-500/20 border-green-500/40 text-green-300"
+                        : "bg-dark-700 border-dark-500 text-gray-400"
+                    }`}
+                  >
+                    {postForm.published ? <Eye size={16} /> : <EyeOff size={16} />}
+                    {postForm.published ? "Pubblicato" : "Bozza"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Excerpt */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  Breve descrizione (anteprima nella lista)
+                </label>
+                <textarea
+                  rows={2} value={postForm.excerpt}
+                  onChange={(e) => setPostForm(f => ({ ...f, excerpt: e.target.value }))}
+                  placeholder="In poche righe di cosa parla l'articolo..."
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm resize-none"
+                />
+              </div>
+
+              {/* Cover URL */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  URL immagine copertina (opzionale)
+                </label>
+                <input
+                  type="url" value={postForm.cover_url}
+                  onChange={(e) => setPostForm(f => ({ ...f, cover_url: e.target.value }))}
+                  placeholder="https://..."
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                />
+              </div>
+
+              {/* Contenuto */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  Contenuto articolo
+                </label>
+                <textarea
+                  rows={14} value={postForm.content}
+                  onChange={(e) => setPostForm(f => ({ ...f, content: e.target.value }))}
+                  placeholder={"Scrivi l'articolo qui...\n\nPuoi usare:\n## Titolo sezione\n### Sottotitolo\n- elemento lista\n> citazione\n\nLascia una riga vuota tra i paragrafi."}
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm resize-none font-mono"
+                />
+                <p className="text-gray-600 text-xs mt-1.5">
+                  ## Titolo · ### Sottotitolo · - lista · &gt; citazione · riga vuota = paragrafo
+                </p>
+              </div>
+
+              {postError && (
+                <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{postError}</p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 p-6 border-t border-dark-700 flex-shrink-0">
+              <button onClick={() => setShowPostForm(false)} className="flex-1 border border-dark-500 text-gray-300 hover:text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors">
+                Annulla
+              </button>
+              <button
+                onClick={savePost} disabled={savingPost}
+                className="flex-1 btn-primary justify-center text-sm py-2.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {savingPost ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                {editingPost ? "Salva modifiche" : "Crea articolo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ RECIPE FORM MODAL ════════════════════════════════════════ */}
       {showForm && (

@@ -1,10 +1,12 @@
 import { Mail, Linkedin } from "lucide-react";
 
 const footerLinks = [
-  { label: "Servizi", href: "#servizi" },
-  { label: "Chi Sono", href: "#chi-sono" },
-  { label: "Perché SPMAB", href: "#perche-spmab" },
-  { label: "Contatti", href: "#contatti" },
+  { label: "Servizi", href: "/#servizi" },
+  { label: "Chi Sono", href: "/#chi-sono" },
+  { label: "Perché SPMAB", href: "/#perche-spmab" },
+  { label: "Contatti", href: "/#contatti" },
+  { label: "Blog", href: "/blog" },
+  { label: "Ricette", href: "/ricette" },
 ];
 
 export default function Footer() {

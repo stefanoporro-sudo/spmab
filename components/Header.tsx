@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
-  { href: "#servizi", label: "Servizi" },
-  { href: "#chi-sono", label: "Chi Sono" },
-  { href: "#perche-spmab", label: "Perché SPMAB" },
-  { href: "#contatti", label: "Contatti" },
+  { href: "/#servizi", label: "Servizi" },
+  { href: "/#chi-sono", label: "Chi Sono" },
+  { href: "/blog", label: "Blog" },
+  { href: "/#contatti", label: "Contatti" },
 ];
 
 export default function Header() {
