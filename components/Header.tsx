@@ -7,6 +7,7 @@ const navLinks = [
   { href: "/#servizi", label: "Servizi" },
   { href: "/#chi-sono", label: "Chi Sono" },
   { href: "/blog", label: "Blog" },
+  { href: "/ricette", label: "Ricette" },
   { href: "/#contatti", label: "Contatti" },
 ];
 
