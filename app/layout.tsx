@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Script from "next/script";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import TrackPageView from "@/components/TrackPageView";
 
 const siteUrl = "https://www.consulenzapizzaiolo.it";
 
@@ -128,6 +129,7 @@ export default function RootLayout({
     <html lang="it" className="noise">
       <body>
         {children}
+        <TrackPageView />
         <WhatsAppButton />
         <Script
           id="json-ld"
