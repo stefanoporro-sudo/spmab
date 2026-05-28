@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Users, Lock, LogOut, Download, Search, RefreshCw,
   ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, FileText,
-  BookOpen, Eye, EyeOff, Star,
+  BookOpen, Eye, EyeOff, Star, BarChart2, Globe, Clock, TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -22,6 +22,32 @@ type Post = {
 type PostForm = Omit<Post, "id" | "published_at" | "created_at">;
 type Testimonial = { id: string; name: string; role: string; stars: number; text: string; active: boolean; sort_order: number };
 type TestimonialForm = Omit<Testimonial, "id">;
+type PageView = { path: string; referrer: string | null; created_at: string };
+type StatsData = {
+  recentViews: PageView[];
+  dailyTotals: { date: string; count: number }[];
+  topPages: { path: string; count: number }[];
+  monthlyTotal: number;
+  todayTotal: number;
+};
+
+const PAGE_LABELS: Record<string, string> = {
+  "/": "🏠 Homepage",
+  "/blog": "📝 Blog",
+  "/ricette": "🍕 Ricette",
+  "/consulenza-molini": "🌾 Consulenza Molini",
+  "/consulenza-pizzaioli": "👨‍🍳 Consulenza Pizzaioli",
+};
+function pageName(path: string): string {
+  if (PAGE_LABELS[path]) return PAGE_LABELS[path];
+  if (path.startsWith("/blog/")) return `📄 ${path.replace("/blog/", "")}`;
+  if (path.startsWith("/ricette/")) return `🍕 ${path.replace("/ricette/", "")}`;
+  return path;
+}
+function referrerName(ref: string | null): string {
+  if (!ref) return "Diretto";
+  try { return new URL(ref).hostname.replace("www.", ""); } catch { return "Diretto"; }
+}
 
 const emptyRecipe: RecipeForm = {
   title: "", category: "Pizza", description: "", level: "Base",
@@ -53,7 +79,9 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni">("iscritti");
+  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni" | "statistiche">("iscritti");
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // ── PDF Generator state ──
   const [pdfForm, setPdfForm] = useState({
@@ -127,6 +155,15 @@ setAuthenticated(true);
     const data = await res.json();
     setSubscribers(data.subscribers ?? []);
     setSubsLoading(false);
+  }, [password]);
+
+  // ── Fetch stats ──────────────────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    const res = await fetch("/api/stats", { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setStats(data);
+    setStatsLoading(false);
   }, [password]);
 
   // ── Fetch recipes ────────────────────────────────────────────────
@@ -526,10 +563,10 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette", "pdf", "blog", "recensioni"] as const).map((t) => (
+              {(["iscritti", "ricette", "pdf", "blog", "recensioni", "statistiche"] as const).map((t) => (
                 <button
                   key={t}
-                  onClick={() => setTab(t)}
+                  onClick={() => { setTab(t); if (t === "statistiche" && !stats) fetchStats(); }}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     tab === t
                       ? "bg-brand-500 text-white shadow"
@@ -540,13 +577,15 @@ setAuthenticated(true);
                     : t === "ricette" ? <ChefHat size={14} />
                     : t === "pdf" ? <FileText size={14} />
                     : t === "blog" ? <BookOpen size={14} />
-                    : <Star size={14} />}
+                    : t === "recensioni" ? <Star size={14} />
+                    : <BarChart2 size={14} />}
                   <span className="hidden sm:inline">
                     {t === "iscritti" ? "Iscritti"
                       : t === "ricette" ? "Ricette"
                       : t === "pdf" ? "PDF"
                       : t === "blog" ? "Blog"
-                      : "Recensioni"}
+                      : t === "recensioni" ? "Recensioni"
+                      : "Statistiche"}
                   </span>
                 </button>
               ))}
@@ -908,6 +947,173 @@ setAuthenticated(true);
                   </div>
                 )}
               </div>
+            )}
+          </>
+        )}
+
+        {/* ══ TAB: STATISTICHE ══════════════════════════════════════ */}
+        {tab === "statistiche" && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-white font-semibold text-lg">Statistiche sito</h2>
+                <p className="text-gray-500 text-sm">Visite e pagine più viste</p>
+              </div>
+              <button onClick={fetchStats} disabled={statsLoading} className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50">
+                <RefreshCw size={14} className={statsLoading ? "animate-spin" : ""} />
+                Aggiorna
+              </button>
+            </div>
+
+            {statsLoading && (
+              <div className="flex items-center justify-center py-20 text-gray-500">
+                <Loader2 size={24} className="animate-spin mr-3" /> Caricamento statistiche...
+              </div>
+            )}
+
+            {!statsLoading && stats && (
+              <>
+                {/* KPI */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <div className="card">
+                    <div className="flex items-center gap-2 mb-2"><TrendingUp className="text-brand-400 w-4 h-4" /><span className="text-gray-400 text-xs">Oggi</span></div>
+                    <div className="font-display text-3xl font-bold gradient-text">{stats.todayTotal}</div>
+                    <div className="text-gray-600 text-xs mt-1">visite</div>
+                  </div>
+                  <div className="card">
+                    <div className="flex items-center gap-2 mb-2"><BarChart2 className="text-brand-400 w-4 h-4" /><span className="text-gray-400 text-xs">Questo mese</span></div>
+                    <div className="font-display text-3xl font-bold gradient-text">{stats.monthlyTotal}</div>
+                    <div className="text-gray-600 text-xs mt-1">visite totali</div>
+                  </div>
+                  <div className="card">
+                    <div className="flex items-center gap-2 mb-2"><Globe className="text-brand-400 w-4 h-4" /><span className="text-gray-400 text-xs">Pagine uniche</span></div>
+                    <div className="font-display text-3xl font-bold gradient-text">{stats.topPages.length}</div>
+                    <div className="text-gray-600 text-xs mt-1">pagine visitate</div>
+                  </div>
+                  <div className="card">
+                    <div className="flex items-center gap-2 mb-2"><Clock className="text-brand-400 w-4 h-4" /><span className="text-gray-400 text-xs">Ultime 200</span></div>
+                    <div className="font-display text-3xl font-bold gradient-text">{stats.recentViews.length}</div>
+                    <div className="text-gray-600 text-xs mt-1">visite registrate</div>
+                  </div>
+                </div>
+
+                {/* Grafico 7 giorni */}
+                <div className="card mb-6">
+                  <h3 className="text-white font-semibold text-sm mb-4">📊 Ultimi 7 giorni</h3>
+                  <div className="flex items-end gap-2 h-24">
+                    {(() => {
+                      const max = Math.max(...stats.dailyTotals.map(d => d.count), 1);
+                      return stats.dailyTotals.map(({ date, count }) => {
+                        const height = Math.max((count / max) * 100, 4);
+                        const label = new Date(date + "T12:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric" });
+                        return (
+                          <div key={date} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-gray-500 text-xs">{count > 0 ? count : ""}</span>
+                            <div
+                              className="w-full rounded-t-md bg-brand-500/70 hover:bg-brand-400 transition-colors"
+                              style={{ height: `${height}%` }}
+                              title={`${label}: ${count} visite`}
+                            />
+                            <span className="text-gray-600 text-xs text-center leading-tight">{label}</span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  {/* Top pagine */}
+                  <div className="card">
+                    <h3 className="text-white font-semibold text-sm mb-4">🏆 Pagine più visitate (30 gg)</h3>
+                    <div className="space-y-2">
+                      {stats.topPages.length === 0 && <p className="text-gray-500 text-sm">Nessun dato ancora</p>}
+                      {stats.topPages.map(({ path, count }) => {
+                        const max = stats.topPages[0]?.count || 1;
+                        return (
+                          <div key={path}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-300 truncate max-w-[200px]">{pageName(path)}</span>
+                              <span className="text-brand-400 font-semibold ml-2">{count}</span>
+                            </div>
+                            <div className="h-1.5 bg-dark-700 rounded-full">
+                              <div className="h-1.5 bg-brand-500 rounded-full" style={{ width: `${(count / max) * 100}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Provenienza */}
+                  <div className="card">
+                    <h3 className="text-white font-semibold text-sm mb-4">🔀 Da dove vengono</h3>
+                    <div className="space-y-2">
+                      {(() => {
+                        const refMap: Record<string, number> = {};
+                        for (const v of stats.recentViews) {
+                          const name = referrerName(v.referrer);
+                          refMap[name] = (refMap[name] || 0) + 1;
+                        }
+                        const sorted = Object.entries(refMap).sort(([,a],[,b]) => b - a).slice(0, 8);
+                        const max = sorted[0]?.[1] || 1;
+                        return sorted.length === 0
+                          ? <p className="text-gray-500 text-sm">Nessun dato ancora</p>
+                          : sorted.map(([source, count]) => (
+                            <div key={source}>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="text-gray-300">{source === "Diretto" ? "🔗 Diretto" : `🌐 ${source}`}</span>
+                                <span className="text-brand-400 font-semibold">{count}</span>
+                              </div>
+                              <div className="h-1.5 bg-dark-700 rounded-full">
+                                <div className="h-1.5 bg-brand-400/70 rounded-full" style={{ width: `${(count / max) * 100}%` }} />
+                              </div>
+                            </div>
+                          ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista visite recenti */}
+                <div className="card">
+                  <h3 className="text-white font-semibold text-sm mb-4">🕐 Visite recenti</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-dark-600">
+                          <th className="text-left text-gray-500 text-xs uppercase tracking-wide pb-3 pr-4">Pagina</th>
+                          <th className="text-left text-gray-500 text-xs uppercase tracking-wide pb-3 pr-4">Provenienza</th>
+                          <th className="text-left text-gray-500 text-xs uppercase tracking-wide pb-3">Data e ora</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.recentViews.map((v, i) => (
+                          <tr key={i} className="border-b border-dark-700/50 hover:bg-dark-700/30 transition-colors">
+                            <td className="py-2.5 pr-4 text-gray-300">{pageName(v.path)}</td>
+                            <td className="py-2.5 pr-4 text-gray-400 text-xs">
+                              {v.referrer ? (
+                                <span title={v.referrer}>🌐 {referrerName(v.referrer)}</span>
+                              ) : (
+                                <span className="text-gray-600">🔗 Diretto</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                              {new Date(v.created_at).toLocaleString("it-IT", {
+                                day: "2-digit", month: "2-digit", year: "2-digit",
+                                hour: "2-digit", minute: "2-digit",
+                              })}
+                            </td>
+                          </tr>
+                        ))}
+                        {stats.recentViews.length === 0 && (
+                          <tr><td colSpan={3} className="py-8 text-center text-gray-500">Nessuna visita registrata ancora</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             )}
           </>
         )}
