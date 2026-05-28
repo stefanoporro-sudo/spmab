@@ -19,10 +19,17 @@ function pageName(path: string): string {
 
 export async function GET(req: NextRequest) {
   // Verifica il cron secret (Vercel lo invia automaticamente)
+  // Oppure accetta ?token=<CRON_SECRET> per test manuali dal browser
   const authHeader = req.headers.get("authorization");
+  const tokenParam = req.nextUrl.searchParams.get("token");
   const cronSecret = process.env.CRON_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const isAuthorized =
+    !cronSecret ||
+    authHeader === `Bearer ${cronSecret}` ||
+    tokenParam === cronSecret;
+
+  if (!isAuthorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
