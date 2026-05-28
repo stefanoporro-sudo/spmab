@@ -244,6 +244,7 @@ export async function GET(req: NextRequest) {
   // --- Invio email via Resend ---
   const resendKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
+  const toEmail = process.env.ADMIN_EMAIL ?? "porroste80@gmail.com";
 
   if (!resendKey) {
     console.error("RESEND_API_KEY mancante");
@@ -258,7 +259,7 @@ export async function GET(req: NextRequest) {
     },
     body: JSON.stringify({
       from: `Consulenza Pizzaiolo Stats <${fromEmail}>`,
-      to: ["stefano@consulenzapizzaiolo.it"],
+      to: [toEmail],
       subject: `📊 ${totalYesterday} visite ieri — Report ${dateStrShort}`,
       html,
     }),
