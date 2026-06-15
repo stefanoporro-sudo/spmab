@@ -1,0 +1,16 @@
+1
+00:00:00,000 --> 00:00:02,000
+ecco qui, salvo ad ora adesso sta informando
+
+2
+00:00:06,640 --> 00:00:09,120
+queste sono i gradi con la cottura ragazzi
+
+3
+00:00:10,640 --> 00:00:12,640
+forno resti d'aglia
+
+4
+00:00:12,640 --> 00:00:14,640
+è una bomba
+

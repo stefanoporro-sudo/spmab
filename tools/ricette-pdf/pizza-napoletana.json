@@ -1,0 +1,24 @@
+{
+  "title": "Pizza Napoletana",
+  "category": "Pizza",
+  "level": "Avanzato",
+  "ingredients": [
+    "Farina 00 (W260/300) 1000gr",
+    "Acqua a temperatura ambiente 600gr",
+    "Sale marino 30gr",
+    "Lievito fresco 2gr"
+  ],
+  "procedure": [
+    "La pizza napoletana verace segue il disciplinare AVPN: impasto a bassa idratazione (60%), lavorato a lungo e steso rigorosamente a mano. Versare l'acqua a temperatura ambiente nell'impastatrice e sciogliervi completamente il sale.",
+    "Aggiungere circa il 10% della farina totale e, una volta assorbita, stemperare il lievito fresco nell'impasto, così da distribuirlo in modo uniforme.",
+    "Avviare l'impastatrice a bassa velocità aggiungendo gradualmente la restante farina, fino al raggiungimento del cosiddetto 'punto di pasta': un impasto liscio, morbido ed elastico, asciutto al tatto e non appiccicoso.",
+    "Continuare a lavorare per circa 10/15 minuti, fino a ottenere una buona incordatura e una massa ben omogenea.",
+    "Lasciare puntare la massa coperta a temperatura ambiente per circa 2 ore, in modo da avviare correttamente la lievitazione.",
+    "Procedere quindi con lo staglio a mano, formando i panetti del peso compreso tra 200 e 280 g, ideali per ottenere una pizza dal diametro di 22/35 cm.",
+    "Riporre i panetti nelle apposite cassette e lasciare lievitare per ulteriori 6/8 ore. La maturazione complessiva dell'impasto deve essere compresa tra 8 e 24 ore.",
+    "Stendere il panetto esclusivamente a mano, mai con il mattarello, partendo dal centro e spingendo l'aria verso il bordo, così da formare il caratteristico cornicione gonfio e ben pronunciato.",
+    "Condire con pomodoro San Marzano, mozzarella (o fior di latte), un filo d'olio extravergine e qualche foglia di basilico fresco.",
+    "Cuocere in forno a legna a circa 430/485°C per soli 60/90 secondi, fino a ottenere un cornicione gonfio, una base morbida ed elastica e le classiche macchie di cottura ('leoparding')."
+  ],
+  "notes": "Il segreto della napoletana è tutto nella stesura a mano e nella cottura velocissima ad altissima temperatura: il cornicione deve restare alto, soffice e leggermente bruciacchiato."
+}

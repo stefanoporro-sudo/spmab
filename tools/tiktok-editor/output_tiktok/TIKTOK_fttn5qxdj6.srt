@@ -1,0 +1,16 @@
+1
+00:00:00,000 --> 00:00:02,000
+ecco qui, salvo ad ora adesso stai informando
+
+2
+00:00:07,000 --> 00:00:09,000
+queste sono i gradi con la cottura, ragazzi
+
+3
+00:00:11,000 --> 00:00:12,000
+forno resti d'aglia
+
+4
+00:00:13,000 --> 00:00:14,000
+e una bomba
+

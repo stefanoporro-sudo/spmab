@@ -1,0 +1,25 @@
+{
+  "title": "Pizza Classica",
+  "category": "Pizza",
+  "level": "Base",
+  "ingredients": [
+    "Farina 0 (W240/260) 1000gr",
+    "Acqua a temperatura ambiente 620gr",
+    "Sale 25gr",
+    "Olio Evo 30gr",
+    "Lievito fresco 5gr"
+  ],
+  "procedure": [
+    "L'impasto classico per la pizza tonda è semplice e versatile, ideale sia per la teglia che per la pizza al piatto. Sciogliere il lievito in parte dell'acqua a temperatura ambiente (20/22°C).",
+    "Inserire nell'impastatrice la farina e l'acqua con il lievito, avviando a prima velocità. Aggiungere la restante acqua poco alla volta, versandola a filo vasca, fino al suo completo assorbimento.",
+    "Quando l'impasto avrà preso struttura, aggiungere il sale e, una volta assorbito, l'olio extravergine di oliva a filo vasca. Lavorare fino a ottenere un impasto liscio, morbido ed elastico.",
+    "Lasciare riposare l'impasto coperto per circa 15/20 minuti, poi eseguire alcune pieghe di rinforzo per dare struttura alla massa.",
+    "Lasciare puntare l'impasto coperto per circa 1 ora a temperatura ambiente, in modo da avviare la lievitazione.",
+    "Procedere con lo staglio formando i panetti del peso di circa 250 g per la pizza tonda al piatto, oppure in base alla teglia utilizzata.",
+    "Lasciare lievitare i panetti per circa 3/4 ore a temperatura ambiente, fino al raddoppio del volume. Per una maggiore digeribilità, è possibile riporli in frigorifero a 5°C per 24 ore, estraendoli 2 ore prima dell'utilizzo.",
+    "Stendere il panetto a mano su un piano leggermente infarinato, partendo dal centro verso i bordi, fino a ottenere il disco della dimensione desiderata.",
+    "Condire a piacere con pomodoro, mozzarella e gli ingredienti preferiti, senza eccedere con la farcitura.",
+    "Cuocere in forno ben caldo: in forno di casa alla massima temperatura (250/280°C) sul ripiano basso o su pietra refrattaria, fino a quando il bordo risulterà dorato e croccante."
+  ],
+  "notes": "Preriscalda sempre il forno al massimo per almeno 20 minuti prima di infornare. Se hai una pietra refrattaria, usala: trattiene il calore e regala una base molto più croccante, simile a quella della pizzeria."
+}
