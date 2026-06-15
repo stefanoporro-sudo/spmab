@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const query = supabase
     .from("posts")
-    .select("id, title, slug, excerpt, category, cover_url, published, published_at, created_at")
+    .select("id, title, slug, excerpt, content, category, cover_url, published, published_at, created_at")
     .order("created_at", { ascending: false });
 
   if (!admin) query.eq("published", true);

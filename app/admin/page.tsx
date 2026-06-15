@@ -113,6 +113,8 @@ export default function AdminPage() {
   const [postError, setPostError] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
   const [deletingPdf, setDeletingPdf] = useState<string | null>(null);
+  // Apertura diretta di un articolo via link email (/admin?edit=ID)
+  const [pendingEditId, setPendingEditId] = useState<string | null>(null);
 
   // ── Testimonials state ───────────────────────────────────────────
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -219,6 +221,21 @@ setAuthenticated(true);
     if (authenticated && tab === "blog") fetchPosts();
     if (authenticated && tab === "recensioni") fetchTestimonials();
   }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchTestimonials]);
+
+  // Se l'URL contiene ?edit=ID (link dalla email), apri il tab blog
+  useEffect(() => {
+    const editId = new URLSearchParams(window.location.search).get("edit");
+    if (editId) { setPendingEditId(editId); setTab("blog"); }
+  }, []);
+
+  // Quando gli articoli sono caricati, apri direttamente quello richiesto dal link
+  useEffect(() => {
+    if (authenticated && pendingEditId && posts.length) {
+      const p = posts.find((x) => x.id === pendingEditId);
+      if (p) { openEditPost(p); setPendingEditId(null); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticated, posts, pendingEditId]);
 
   // ── Testimonial helpers ──────────────────────────────────────────
   const openNewTesti = () => { setEditingTesti(null); setTestiForm(emptyTestimonial); setTestiError(""); setShowTestiForm(true); };
