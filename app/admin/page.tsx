@@ -101,6 +101,11 @@ export default function AdminPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [subsLoading, setSubsLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editSubForm, setEditSubForm] = useState<{ name: string; email: string }>({ name: "", email: "" });
+  const [savingSub, setSavingSub] = useState(false);
+  const [deletingSubId, setDeletingSubId] = useState<string | null>(null);
+  const [subError, setSubError] = useState("");
 
   // ── Blog (Posts) state ──
   const [posts, setPosts] = useState<Post[]>([]);
@@ -158,6 +163,38 @@ setAuthenticated(true);
     setSubscribers(data.subscribers ?? []);
     setSubsLoading(false);
   }, [password]);
+
+  // ── Subscriber edit / delete helpers ─────────────────────────────
+  const startEditSub = (s: Subscriber) => {
+    setEditingSubId(s.id);
+    setEditSubForm({ name: s.name, email: s.email });
+    setSubError("");
+  };
+  const cancelEditSub = () => { setEditingSubId(null); setSubError(""); };
+  const saveSub = async (id: string) => {
+    if (!editSubForm.name.trim() || !editSubForm.email.trim()) { setSubError("Nome ed email sono obbligatori."); return; }
+    setSavingSub(true); setSubError("");
+    const res = await fetch(`/api/subscribers/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify(editSubForm),
+    });
+    setSavingSub(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setSubError(d.error || "Errore nel salvataggio.");
+      return;
+    }
+    setEditingSubId(null);
+    refreshSubscribers();
+  };
+  const deleteSub = async (s: Subscriber) => {
+    if (!confirm(`Eliminare l'iscritto "${s.name}" (${s.email})?`)) return;
+    setDeletingSubId(s.id);
+    await fetch(`/api/subscribers/${s.id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+    setDeletingSubId(null);
+    refreshSubscribers();
+  };
 
   // ── Fetch stats ──────────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
@@ -666,9 +703,12 @@ setAuthenticated(true);
               </button>
             </div>
 
+            {subError && (
+              <div className="mb-3 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">{subError}</div>
+            )}
             <div className="bg-dark-800 border border-dark-600 rounded-2xl overflow-hidden">
-              <div className="grid grid-cols-3 gap-4 px-6 py-3 border-b border-dark-700 text-gray-500 text-xs uppercase tracking-wide font-semibold">
-                <div>Nome</div><div>Email</div><div>Data iscrizione</div>
+              <div className="grid grid-cols-[2fr_3fr_2fr_auto] gap-4 px-6 py-3 border-b border-dark-700 text-gray-500 text-xs uppercase tracking-wide font-semibold">
+                <div>Nome</div><div>Email</div><div>Data iscrizione</div><div className="text-right">Azioni</div>
               </div>
               {filteredSubs.length === 0 ? (
                 <div className="px-6 py-16 text-center text-gray-600 text-sm">
@@ -677,12 +717,48 @@ setAuthenticated(true);
               ) : (
                 <div className="divide-y divide-dark-700">
                   {filteredSubs.map((s) => (
-                    <div key={s.id} className="grid grid-cols-3 gap-4 px-6 py-4 hover:bg-dark-700/50 transition-colors">
-                      <div className="text-white text-sm font-medium truncate">{s.name}</div>
-                      <div className="text-gray-400 text-sm truncate">{s.email}</div>
-                      <div className="text-gray-500 text-sm">
-                        {new Date(s.subscribed_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
-                      </div>
+                    <div key={s.id} className="grid grid-cols-[2fr_3fr_2fr_auto] gap-4 px-6 py-4 hover:bg-dark-700/50 transition-colors items-center">
+                      {editingSubId === s.id ? (
+                        <>
+                          <input
+                            value={editSubForm.name}
+                            onChange={(e) => setEditSubForm((f) => ({ ...f, name: e.target.value }))}
+                            className="bg-dark-900 border border-dark-600 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-brand-500"
+                          />
+                          <input
+                            value={editSubForm.email}
+                            onChange={(e) => setEditSubForm((f) => ({ ...f, email: e.target.value }))}
+                            className="bg-dark-900 border border-dark-600 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-brand-500"
+                          />
+                          <div className="text-gray-500 text-sm">
+                            {new Date(s.subscribed_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => saveSub(s.id)} disabled={savingSub} title="Salva" className="text-green-400 hover:text-green-300 disabled:opacity-50">
+                              {savingSub ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                            </button>
+                            <button onClick={cancelEditSub} disabled={savingSub} title="Annulla" className="text-gray-400 hover:text-white disabled:opacity-50">
+                              <X size={16} />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-white text-sm font-medium truncate">{s.name}</div>
+                          <div className="text-gray-400 text-sm truncate">{s.email}</div>
+                          <div className="text-gray-500 text-sm">
+                            {new Date(s.subscribed_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+                          </div>
+                          <div className="flex items-center justify-end gap-3">
+                            <button onClick={() => startEditSub(s)} title="Modifica" className="text-gray-400 hover:text-brand-300">
+                              <Pencil size={15} />
+                            </button>
+                            <button onClick={() => deleteSub(s)} disabled={deletingSubId === s.id} title="Elimina" className="text-gray-400 hover:text-red-400 disabled:opacity-50">
+                              {deletingSubId === s.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
