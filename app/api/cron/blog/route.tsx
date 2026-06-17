@@ -126,7 +126,24 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     content: string;
   };
   try {
-    article = JSON.parse(rawText);
+    // Estrae il primo oggetto JSON valido (ignora caratteri extra prima/dopo)
+    const start = rawText.indexOf("{");
+    if (start === -1) throw new Error("no {");
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    let end = -1;
+    for (let i = start; i < rawText.length; i++) {
+      const ch = rawText[i];
+      if (esc) { esc = false; continue; }
+      if (ch === "\\" && inStr) { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === "{") depth++;
+      if (ch === "}") { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end === -1) throw new Error("no closing }");
+    article = JSON.parse(rawText.slice(start, end + 1));
   } catch {
     return NextResponse.json(
       { error: "Claude non ha restituito JSON valido", raw: rawText },
