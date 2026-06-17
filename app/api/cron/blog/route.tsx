@@ -5,7 +5,12 @@ import { supabase } from "@/lib/supabase";
 function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  return !cronSecret || authHeader === `Bearer ${cronSecret}`;
+  const adminPassword = req.headers.get("x-admin-password");
+  // Vercel cron usa Bearer CRON_SECRET; test manuale usa x-admin-password
+  return (
+    (!cronSecret || authHeader === `Bearer ${cronSecret}`) ||
+    (!!process.env.ADMIN_PASSWORD && adminPassword === process.env.ADMIN_PASSWORD)
+  );
 }
 
 function mdToHtml(md: string): string {
