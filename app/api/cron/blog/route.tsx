@@ -97,6 +97,10 @@ Formato:
 - NO grassetto **
 - Termina sempre con una CTA "> " che invita a visitare consulenzapizzaiolo.it per una consulenza
 
+REGOLE OBBLIGATORIE:
+- Usa sempre "fermentazione" al posto di "maturazione" (la parola "maturazione" è vietata)
+- NON affermare mai che la fermentazione migliora la digeribilità della pizza: questa affermazione è falsa. La digeribilità è determinata principalmente dalla farcitura e dalla cottura
+
 Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
   "title": "Titolo SEO accattivante",
@@ -150,6 +154,14 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
       { status: 500 }
     );
   }
+
+  // Filtro di sicurezza: sostituisce "maturazione" con "fermentazione" ovunque
+  const sanitize = (t: string) =>
+    t.replace(/\bMaturazione\b/g, "Fermentazione").replace(/\bmaturazione\b/g, "fermentazione");
+  article.title   = sanitize(article.title);
+  article.slug    = sanitize(article.slug);
+  article.excerpt = sanitize(article.excerpt);
+  article.content = sanitize(article.content);
 
   // 3. Crea bozza su Supabase
   let slug = article.slug;
