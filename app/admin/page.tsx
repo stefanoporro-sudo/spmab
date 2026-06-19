@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Users, Lock, LogOut, Download, Search, RefreshCw,
   ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, FileText,
-  BookOpen, Eye, EyeOff, Star, BarChart2, Globe, Clock, TrendingUp,
+  BookOpen, Eye, EyeOff, Star, BarChart2, Globe, Clock, TrendingUp, MessageCircle, Pin, Send,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -22,6 +22,8 @@ type Post = {
 type PostForm = Omit<Post, "id" | "published_at" | "created_at">;
 type Testimonial = { id: string; name: string; role: string; stars: number; text: string; active: boolean; sort_order: number };
 type TestimonialForm = Omit<Testimonial, "id">;
+type ForumThread = { id: string; title: string; body: string; author_name: string; author_email: string; visible: boolean; pinned: boolean; created_at: string; reply_count: number };
+type ForumReply = { id: string; body: string; author_name: string; author_email: string; is_admin: boolean; visible: boolean; created_at: string };
 type PageView = { path: string; referrer: string | null; created_at: string };
 type StatsData = {
   recentViews: PageView[];
@@ -79,7 +81,7 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni" | "statistiche">("iscritti");
+  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni" | "statistiche" | "forum">("iscritti");
   const [stats, setStats] = useState<StatsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -130,6 +132,16 @@ export default function AdminPage() {
   const [savingTesti, setSavingTesti] = useState(false);
   const [deletingTestiId, setDeletingTestiId] = useState<string | null>(null);
   const [testiError, setTestiError] = useState("");
+
+  // ── Forum state ──
+  const [forumThreads, setForumThreads] = useState<ForumThread[]>([]);
+  const [forumLoading, setForumLoading] = useState(false);
+  const [openThread, setOpenThread] = useState<{ thread: ForumThread; replies: ForumReply[] } | null>(null);
+  const [forumReply, setForumReply] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+  const [newThreadForm, setNewThreadForm] = useState({ title: "", body: "" });
+  const [showNewThread, setShowNewThread] = useState(false);
+  const [savingThread, setSavingThread] = useState(false);
 
   // ── Recipes state ──
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -252,12 +264,92 @@ setAuthenticated(true);
     setTestiLoading(false);
   }, [password]);
 
+  // ── Forum helpers ────────────────────────────────────────────────
+  const fetchForumThreads = useCallback(async () => {
+    setForumLoading(true);
+    const res = await fetch("/api/forum/threads", { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setForumThreads(data.threads ?? []);
+    setForumLoading(false);
+  }, [password]);
+
+  const openForumThread = async (t: ForumThread) => {
+    const res = await fetch(`/api/forum/threads/${t.id}`, { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setOpenThread({ thread: data.thread, replies: data.replies ?? [] });
+    setForumReply("");
+  };
+
+  const sendForumReply = async () => {
+    if (!openThread || !forumReply.trim()) return;
+    setSendingReply(true);
+    await fetch(`/api/forum/threads/${openThread.thread.id}/replies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ body: forumReply, author_name: "Stefano Porro", author_email: "stefano@consulenzapizzaiolo.it" }),
+    });
+    setSendingReply(false);
+    setForumReply("");
+    openForumThread(openThread.thread);
+  };
+
+  const toggleThreadVisible = async (t: ForumThread) => {
+    await fetch(`/api/forum/threads/${t.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ visible: !t.visible }),
+    });
+    fetchForumThreads();
+    if (openThread?.thread.id === t.id) setOpenThread(null);
+  };
+
+  const toggleThreadPinned = async (t: ForumThread) => {
+    await fetch(`/api/forum/threads/${t.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ pinned: !t.pinned }),
+    });
+    fetchForumThreads();
+  };
+
+  const deleteThread = async (id: string) => {
+    if (!confirm("Eliminare questa discussione e tutte le risposte?")) return;
+    await fetch(`/api/forum/threads/${id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+    setOpenThread(null);
+    fetchForumThreads();
+  };
+
+  const deleteReply = async (replyId: string) => {
+    if (!openThread) return;
+    await fetch(`/api/forum/threads/${openThread.thread.id}/replies`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ reply_id: replyId }),
+    });
+    openForumThread(openThread.thread);
+  };
+
+  const createAdminThread = async () => {
+    if (!newThreadForm.title.trim() || !newThreadForm.body.trim()) return;
+    setSavingThread(true);
+    await fetch("/api/forum/threads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ ...newThreadForm, author_name: "Stefano Porro", author_email: "stefano@consulenzapizzaiolo.it" }),
+    });
+    setSavingThread(false);
+    setShowNewThread(false);
+    setNewThreadForm({ title: "", body: "" });
+    fetchForumThreads();
+  };
+
   useEffect(() => {
     if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); }
     if (authenticated && tab === "pdf") fetchPdfFiles();
     if (authenticated && tab === "blog") fetchPosts();
     if (authenticated && tab === "recensioni") fetchTestimonials();
-  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchTestimonials]);
+    if (authenticated && tab === "forum") fetchForumThreads();
+  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchTestimonials, fetchForumThreads]);
 
   // Se l'URL contiene ?edit=ID (link dalla email), apri il tab blog
   useEffect(() => {
@@ -617,7 +709,7 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette", "pdf", "blog", "recensioni", "statistiche"] as const).map((t) => (
+              {(["iscritti", "ricette", "pdf", "blog", "recensioni", "statistiche", "forum"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => { setTab(t); if (t === "statistiche" && !stats) fetchStats(); }}
@@ -632,6 +724,7 @@ setAuthenticated(true);
                     : t === "pdf" ? <FileText size={14} />
                     : t === "blog" ? <BookOpen size={14} />
                     : t === "recensioni" ? <Star size={14} />
+                    : t === "forum" ? <MessageCircle size={14} />
                     : <BarChart2 size={14} />}
                   <span className="hidden sm:inline">
                     {t === "iscritti" ? "Iscritti"
@@ -639,6 +732,7 @@ setAuthenticated(true);
                       : t === "pdf" ? "PDF"
                       : t === "blog" ? "Blog"
                       : t === "recensioni" ? "Recensioni"
+                      : t === "forum" ? "Forum"
                       : "Statistiche"}
                   </span>
                 </button>
@@ -1042,6 +1136,126 @@ setAuthenticated(true);
               </div>
             )}
           </>
+        )}
+
+        {/* ══ TAB: FORUM ════════════════════════════════════════════ */}
+        {tab === "forum" && (
+          <div className="flex gap-6 h-[70vh]">
+            {/* Lista thread */}
+            <div className="w-80 shrink-0 flex flex-col gap-3 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-white font-semibold">Discussioni</h2>
+                <button onClick={() => setShowNewThread(true)}
+                  className="flex items-center gap-1 text-brand-400 hover:text-brand-300 text-sm transition-colors">
+                  <Plus size={14} /> Nuova
+                </button>
+              </div>
+              {showNewThread && (
+                <div className="bg-dark-700 border border-dark-500 rounded-xl p-4 flex flex-col gap-3">
+                  <input type="text" placeholder="Titolo discussione" value={newThreadForm.title}
+                    onChange={(e) => setNewThreadForm(f => ({ ...f, title: e.target.value }))}
+                    className="w-full bg-dark-800 border border-dark-500 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-500" />
+                  <textarea rows={3} placeholder="Testo..." value={newThreadForm.body}
+                    onChange={(e) => setNewThreadForm(f => ({ ...f, body: e.target.value }))}
+                    className="w-full bg-dark-800 border border-dark-500 rounded-xl px-3 py-2 text-white text-sm resize-none focus:outline-none focus:border-brand-500" />
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowNewThread(false)}
+                      className="flex-1 border border-dark-500 text-gray-400 rounded-lg py-1.5 text-xs">Annulla</button>
+                    <button onClick={createAdminThread} disabled={savingThread}
+                      className="flex-1 bg-brand-500 text-white rounded-lg py-1.5 text-xs font-medium disabled:opacity-60">
+                      {savingThread ? "..." : "Pubblica"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {forumLoading ? (
+                <div className="text-gray-500 text-sm text-center py-8">Caricamento...</div>
+              ) : forumThreads.length === 0 ? (
+                <div className="text-gray-500 text-sm text-center py-8">Nessuna discussione</div>
+              ) : (
+                forumThreads.map((t) => (
+                  <button key={t.id} onClick={() => openForumThread(t)}
+                    className={`text-left p-3 rounded-xl border transition-all ${openThread?.thread.id === t.id ? "border-brand-500/60 bg-brand-500/10" : "border-dark-600 hover:border-dark-500"} ${!t.visible ? "opacity-50" : ""}`}>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className="text-white text-sm font-medium line-clamp-1">{t.pinned && "📌 "}{t.title}</span>
+                      <span className="text-gray-600 text-xs shrink-0">{t.reply_count} risp.</span>
+                    </div>
+                    <div className="text-gray-500 text-xs line-clamp-1">{t.body}</div>
+                    <div className="text-gray-600 text-xs mt-1">di {t.author_name}</div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* Dettaglio thread */}
+            <div className="flex-1 flex flex-col border border-dark-600 rounded-2xl overflow-hidden">
+              {!openThread ? (
+                <div className="flex-1 flex items-center justify-center text-gray-600">
+                  <div className="text-center">
+                    <MessageCircle size={32} className="mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">Seleziona una discussione</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Header thread */}
+                  <div className="p-4 border-b border-dark-600 flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-white font-semibold mb-1">{openThread.thread.title}</h3>
+                      <p className="text-gray-400 text-sm">{openThread.thread.body}</p>
+                      <p className="text-gray-600 text-xs mt-1">di {openThread.thread.author_name} — {openThread.thread.author_email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => toggleThreadPinned(openThread.thread)} title={openThread.thread.pinned ? "Rimuovi da evidenza" : "Metti in evidenza"}
+                        className={`p-1.5 rounded-lg transition-colors ${openThread.thread.pinned ? "text-brand-400 bg-brand-500/10" : "text-gray-500 hover:text-brand-400"}`}>
+                        <Pin size={14} />
+                      </button>
+                      <button onClick={() => toggleThreadVisible(openThread.thread)} title={openThread.thread.visible ? "Nascondi" : "Mostra"}
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-yellow-400 transition-colors">
+                        {openThread.thread.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </button>
+                      <button onClick={() => deleteThread(openThread.thread.id)} title="Elimina discussione"
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Risposte */}
+                  <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+                    {openThread.replies.length === 0 && (
+                      <p className="text-gray-600 text-sm text-center py-6">Nessuna risposta ancora.</p>
+                    )}
+                    {openThread.replies.map((r) => (
+                      <div key={r.id} className={`rounded-xl p-3 ${r.is_admin ? "bg-brand-500/10 border border-brand-500/20" : "bg-dark-700 border border-dark-600"}`}>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <span className={`text-xs font-semibold ${r.is_admin ? "text-brand-300" : "text-gray-300"}`}>
+                            {r.is_admin ? "👨‍🍳 Stefano Porro" : r.author_name}
+                          </span>
+                          <button onClick={() => deleteReply(r.id)} className="text-gray-600 hover:text-red-400 transition-colors">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <p className="text-gray-300 text-sm whitespace-pre-wrap">{r.body}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Box risposta admin */}
+                  <div className="p-4 border-t border-dark-600 flex gap-2">
+                    <textarea rows={2} placeholder="Scrivi la tua risposta come Stefano Porro..."
+                      value={forumReply}
+                      onChange={(e) => setForumReply(e.target.value)}
+                      className="flex-1 bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-white text-sm resize-none focus:outline-none focus:border-brand-500" />
+                    <button onClick={sendForumReply} disabled={sendingReply || !forumReply.trim()}
+                      className="bg-brand-500 hover:bg-brand-400 text-white px-4 rounded-xl disabled:opacity-50 transition-colors">
+                      {sendingReply ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ══ TAB: STATISTICHE ══════════════════════════════════════ */}
