@@ -11,6 +11,7 @@ type Recipe = {
   description: string;
   level: string;
   file_url: string;
+  image_url: string;
   active: boolean;
   sort_order: number;
 };
@@ -75,13 +76,24 @@ export default function RicettePage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {recipes.map((r) => (
-              <div key={r.id} className="card flex flex-col gap-4 group">
-                <div className="w-11 h-11 rounded-xl bg-brand-500/15 flex items-center justify-center group-hover:bg-brand-500/25 transition-colors">
-                  <ChefHat className="text-brand-400 w-5 h-5" />
-                </div>
+              <div key={r.id} className="card flex flex-col gap-0 group overflow-hidden p-0">
+                {/* Immagine */}
+                {r.image_url ? (
+                  <div className="w-full h-44 overflow-hidden">
+                    <img
+                      src={r.image_url}
+                      alt={r.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-44 bg-dark-700 flex items-center justify-center">
+                    <ChefHat className="text-brand-400/40 w-10 h-10" />
+                  </div>
+                )}
 
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                <div className="flex flex-col gap-3 p-5 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs bg-brand-500/15 text-brand-300 px-2 py-0.5 rounded-full">
                       {r.category}
                     </span>
@@ -91,30 +103,30 @@ export default function RicettePage() {
                       </span>
                     )}
                   </div>
-                  <h3 className="text-white font-semibold text-base leading-snug mb-2">
+                  <h3 className="text-white font-semibold text-base leading-snug">
                     {r.title}
                   </h3>
                   {r.description && (
-                    <p className="text-gray-400 text-sm leading-relaxed">{r.description}</p>
+                    <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">{r.description}</p>
+                  )}
+
+                  {r.file_url ? (
+                    <a
+                      href={r.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      className="mt-auto inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-4 py-2.5 rounded-full text-sm transition-all duration-300 hover:scale-105 self-start"
+                    >
+                      <Download size={14} />
+                      Scarica PDF
+                    </a>
+                  ) : (
+                    <span className="mt-auto inline-flex items-center gap-2 bg-dark-700 text-gray-500 px-4 py-2.5 rounded-full text-sm self-start">
+                      PDF in arrivo
+                    </span>
                   )}
                 </div>
-
-                {r.file_url ? (
-                  <a
-                    href={r.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
-                    className="mt-auto inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-4 py-2.5 rounded-full text-sm transition-all duration-300 hover:scale-105 self-start"
-                  >
-                    <Download size={14} />
-                    Scarica PDF
-                  </a>
-                ) : (
-                  <span className="mt-auto inline-flex items-center gap-2 bg-dark-700 text-gray-500 px-4 py-2.5 rounded-full text-sm self-start">
-                    PDF in arrivo
-                  </span>
-                )}
               </div>
             ))}
           </div>

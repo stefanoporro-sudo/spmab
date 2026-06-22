@@ -12,7 +12,7 @@ import Link from "next/link";
 type Subscriber = { id: string; name: string; email: string; subscribed_at: string };
 type Recipe = {
   id: string; title: string; category: string; description: string;
-  level: string; file_url: string; active: boolean; sort_order: number;
+  level: string; file_url: string; image_url: string; active: boolean; sort_order: number;
 };
 type RecipeForm = Omit<Recipe, "id">;
 type Post = {
@@ -53,7 +53,7 @@ function referrerName(ref: string | null): string {
 
 const emptyRecipe: RecipeForm = {
   title: "", category: "Pizza", description: "", level: "Base",
-  file_url: "", active: true, sort_order: 99,
+  file_url: "", image_url: "", active: true, sort_order: 99,
 };
 const emptyPost: PostForm = {
   title: "", slug: "", excerpt: "", content: "",
@@ -152,6 +152,7 @@ export default function AdminPage() {
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [recipeError, setRecipeError] = useState("");
+  const [uploadingRecipeImg, setUploadingRecipeImg] = useState(false);
 
   // ── Auth ────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
@@ -470,7 +471,7 @@ setAuthenticated(true);
     setEditingRecipe(r);
     setRecipeForm({
       title: r.title, category: r.category, description: r.description,
-      level: r.level, file_url: r.file_url, active: r.active, sort_order: r.sort_order,
+      level: r.level, file_url: r.file_url, image_url: r.image_url ?? "", active: r.active, sort_order: r.sort_order,
     });
     setRecipeError("");
     setShowForm(true);
@@ -1856,6 +1857,56 @@ setAuthenticated(true);
                   placeholder="Breve descrizione della ricetta..."
                   className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 transition-colors text-sm resize-none"
                 />
+              </div>
+
+              {/* Immagine ricetta */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Immagine ricetta</label>
+                {recipeForm.image_url ? (
+                  <div className="relative rounded-xl overflow-hidden mb-2">
+                    <img src={recipeForm.image_url} alt="Anteprima" className="w-full h-40 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setRecipeForm({ ...recipeForm, image_url: "" })}
+                      className="absolute top-2 right-2 bg-dark-900/80 text-white rounded-lg p-1.5 hover:bg-red-500/80 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-dark-500 rounded-xl p-6 cursor-pointer hover:border-brand-500/50 transition-colors">
+                    {uploadingRecipeImg ? (
+                      <Loader2 size={20} className="text-brand-400 animate-spin mb-2" />
+                    ) : (
+                      <ChefHat size={20} className="text-gray-600 mb-2" />
+                    )}
+                    <span className="text-gray-500 text-xs">{uploadingRecipeImg ? "Caricamento..." : "Clicca per caricare un'immagine"}</span>
+                    <span className="text-gray-600 text-xs mt-0.5">JPG, PNG, WebP — max 5MB</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={uploadingRecipeImg}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingRecipeImg(true);
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        const res = await fetch("/api/recipes/upload", {
+                          method: "POST",
+                          headers: { "x-admin-password": password },
+                          body: fd,
+                        });
+                        const data = await res.json();
+                        setUploadingRecipeImg(false);
+                        if (data.url) setRecipeForm(f => ({ ...f, image_url: data.url }));
+                        else alert(data.error ?? "Errore upload");
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
               </div>
 
               <div>
