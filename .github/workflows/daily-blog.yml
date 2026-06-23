@@ -1,0 +1,33 @@
+name: Genera Articolo Blog Giornaliero
+
+on:
+  schedule:
+    # 06:30 UTC = 08:30 CEST (ora italiana estiva)
+    # Lunedì-Venerdì
+    - cron: "30 6 * * 1-5"
+  workflow_dispatch: # permette di avviare manualmente dalla dashboard GitHub
+
+jobs:
+  genera-articolo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Chiama l'endpoint del blog
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -X GET "https://www.consulenzapizzaiolo.it/api/cron/blog" \
+            -H "x-admin-password: ${{ secrets.ADMIN_PASSWORD }}" \
+            --max-time 90)
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+
+          echo "HTTP status: $http_code"
+          echo "Response: $body"
+
+          if [ "$http_code" != "200" ]; then
+            echo "ERRORE: l'endpoint ha restituito HTTP $http_code"
+            exit 1
+          fi
+
+          echo "Articolo generato con successo!"
