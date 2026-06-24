@@ -24,10 +24,13 @@ export async function GET(req: NextRequest) {
   const tokenParam = req.nextUrl.searchParams.get("token");
   const cronSecret = process.env.CRON_SECRET;
 
+  const adminPassword = req.headers.get("x-admin-password");
+
   const isAuthorized =
     !cronSecret ||
     authHeader === `Bearer ${cronSecret}` ||
-    tokenParam === cronSecret;
+    tokenParam === cronSecret ||
+    (!!process.env.ADMIN_PASSWORD && adminPassword === process.env.ADMIN_PASSWORD);
 
   if (!isAuthorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

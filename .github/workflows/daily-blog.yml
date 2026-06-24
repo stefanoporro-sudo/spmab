@@ -1,13 +1,29 @@
-name: Genera Articolo Blog Giornaliero
+name: Cron Giornalieri Consulenza Pizzaiolo
 
 on:
   schedule:
-    # 06:30 UTC = 08:30 CEST (ora italiana estiva)
-    # Lunedì-Venerdì
+    # 07:00 UTC = 09:00 CEST — report statistiche (ogni giorno)
+    - cron: "0 7 * * *"
+    # 06:30 UTC = 08:30 CEST — articolo blog (lunedì-venerdì)
     - cron: "30 6 * * 1-5"
-  workflow_dispatch: # permette di avviare manualmente dalla dashboard GitHub
+  workflow_dispatch:
 
 jobs:
+  report-statistiche:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Invia report statistiche giornaliero
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -X GET "https://www.consulenzapizzaiolo.it/api/cron/daily-report" \
+            -H "x-admin-password: ${{ secrets.ADMIN_PASSWORD }}" \
+            --max-time 30)
+          http_code=$(echo "$response" | tail -n1)
+          echo "HTTP status: $http_code"
+          echo "Response: $(echo "$response" | head -n-1)"
+          if [ "$http_code" != "200" ]; then exit 1; fi
+
   genera-articolo:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -18,16 +34,7 @@ jobs:
             -X GET "https://www.consulenzapizzaiolo.it/api/cron/blog" \
             -H "x-admin-password: ${{ secrets.ADMIN_PASSWORD }}" \
             --max-time 90)
-
           http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
-
           echo "HTTP status: $http_code"
-          echo "Response: $body"
-
-          if [ "$http_code" != "200" ]; then
-            echo "ERRORE: l'endpoint ha restituito HTTP $http_code"
-            exit 1
-          fi
-
-          echo "Articolo generato con successo!"
+          echo "Response: $(echo "$response" | head -n-1)"
+          if [ "$http_code" != "200" ]; then exit 1; fi
