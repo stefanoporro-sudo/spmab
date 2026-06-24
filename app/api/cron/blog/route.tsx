@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ImageResponse } from "next/og";
 import { supabase } from "@/lib/supabase";
+import { waitUntil } from "@vercel/functions";
 
 function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
@@ -53,11 +54,7 @@ function mdToHtml(md: string): string {
   return out.join("\n");
 }
 
-export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function generateArticle() {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY mancante" }, { status: 500 });
@@ -384,13 +381,15 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     emailSent = emailRes.ok;
   }
 
-  return NextResponse.json({
-    ok: true,
-    postId,
-    title: article.title,
-    slug,
-    coverUrl: coverUrl || null,
-    emailSent,
-    adminUrl,
-  });
+  console.log(`[blog-cron] Articolo creato: "${article.title}" (${postId}) — email: ${emailSent}`);
+}
+
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  waitUntil(generateArticle());
+
+  return NextResponse.json({ ok: true, started: true });
 }
