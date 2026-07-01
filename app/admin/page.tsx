@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Users, Lock, LogOut, Download, Search, RefreshCw,
   ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, FileText,
-  BookOpen, Eye, EyeOff, Star, BarChart2, Globe, Clock, TrendingUp, MessageCircle, Pin, Send,
+  BookOpen, Eye, EyeOff, Star, BarChart2, Globe, Clock, TrendingUp, MessageCircle, Pin, Send, UserSquare2, MapPin, Upload,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -24,6 +24,8 @@ type Testimonial = { id: string; name: string; role: string; stars: number; text
 type TestimonialForm = Omit<Testimonial, "id">;
 type ForumThread = { id: string; title: string; body: string; author_name: string; author_email: string; visible: boolean; pinned: boolean; created_at: string; reply_count: number };
 type ForumReply = { id: string; body: string; author_name: string; author_email: string; is_admin: boolean; visible: boolean; created_at: string };
+type Collaborator = { id: string; name: string; slug: string; bio: string; photo_url: string; specialty: string; city: string; active: boolean; sort_order: number };
+type CollaboratorForm = Omit<Collaborator, "id">;
 type PageView = { path: string; referrer: string | null; created_at: string };
 type StatsData = {
   recentViews: PageView[];
@@ -61,6 +63,7 @@ const emptyPost: PostForm = {
 };
 const POST_CATEGORIES = ["Pizza", "Panificazione", "Consulenza", "Business", "Generale"];
 const emptyTestimonial: TestimonialForm = { name: "", role: "", stars: 5, text: "", active: true, sort_order: 99 };
+const emptyCollaborator: CollaboratorForm = { name: "", slug: "", bio: "", photo_url: "", specialty: "", city: "", active: true, sort_order: 99 };
 
 function toSlug(title: string) {
   return title
@@ -81,7 +84,7 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni" | "statistiche" | "forum">("iscritti");
+  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni" | "statistiche" | "forum" | "collaboratori">("iscritti");
   const [stats, setStats] = useState<StatsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -142,6 +145,17 @@ export default function AdminPage() {
   const [newThreadForm, setNewThreadForm] = useState({ title: "", body: "" });
   const [showNewThread, setShowNewThread] = useState(false);
   const [savingThread, setSavingThread] = useState(false);
+
+  // ── Collaborators state ──
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [collabLoading, setCollabLoading] = useState(false);
+  const [showCollabForm, setShowCollabForm] = useState(false);
+  const [editingCollab, setEditingCollab] = useState<Collaborator | null>(null);
+  const [collabForm, setCollabForm] = useState<CollaboratorForm>(emptyCollaborator);
+  const [savingCollab, setSavingCollab] = useState(false);
+  const [deletingCollabId, setDeletingCollabId] = useState<string | null>(null);
+  const [collabError, setCollabError] = useState("");
+  const [uploadingCollabPhoto, setUploadingCollabPhoto] = useState(false);
 
   // ── Recipes state ──
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -344,13 +358,61 @@ setAuthenticated(true);
     fetchForumThreads();
   };
 
+  // ── Collaborators helpers ────────────────────────────────────────
+  const fetchCollaborators = useCallback(async () => {
+    setCollabLoading(true);
+    const res = await fetch("/api/collaborators", { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setCollaborators(data.collaborators ?? []);
+    setCollabLoading(false);
+  }, [password]);
+
+  const openNewCollab = () => { setEditingCollab(null); setCollabForm(emptyCollaborator); setCollabError(""); setShowCollabForm(true); };
+  const openEditCollab = (c: Collaborator) => { setEditingCollab(c); setCollabForm({ name: c.name, slug: c.slug, bio: c.bio, photo_url: c.photo_url, specialty: c.specialty, city: c.city, active: c.active, sort_order: c.sort_order }); setCollabError(""); setShowCollabForm(true); };
+
+  const saveCollab = async () => {
+    if (!collabForm.name.trim()) { setCollabError("Il nome è obbligatorio."); return; }
+    const slug = collabForm.slug.trim() || toSlug(collabForm.name);
+    setSavingCollab(true); setCollabError("");
+    const method = editingCollab ? "PUT" : "POST";
+    const url = editingCollab ? `/api/collaborators/${editingCollab.id}` : "/api/collaborators";
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ ...collabForm, slug }),
+    });
+    setSavingCollab(false);
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setCollabError(d.error || "Errore nel salvataggio."); return; }
+    setShowCollabForm(false);
+    fetchCollaborators();
+  };
+
+  const deleteCollab = async (c: Collaborator) => {
+    if (!confirm(`Eliminare "${c.name}"?`)) return;
+    setDeletingCollabId(c.id);
+    await fetch(`/api/collaborators/${c.id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+    setDeletingCollabId(null);
+    fetchCollaborators();
+  };
+
+  const uploadCollabPhoto = async (file: File) => {
+    setUploadingCollabPhoto(true);
+    const fd = new FormData(); fd.append("file", file);
+    const res = await fetch("/api/collaborators/upload", { method: "POST", headers: { "x-admin-password": password }, body: fd });
+    const data = await res.json();
+    setUploadingCollabPhoto(false);
+    if (data.url) setCollabForm((f) => ({ ...f, photo_url: data.url }));
+    else setCollabError(data.error || "Errore nel caricamento foto.");
+  };
+
   useEffect(() => {
     if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); }
     if (authenticated && tab === "pdf") fetchPdfFiles();
     if (authenticated && tab === "blog") fetchPosts();
     if (authenticated && tab === "recensioni") fetchTestimonials();
     if (authenticated && tab === "forum") fetchForumThreads();
-  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchTestimonials, fetchForumThreads]);
+    if (authenticated && tab === "collaboratori") fetchCollaborators();
+  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchTestimonials, fetchForumThreads, fetchCollaborators]);
 
   // Se l'URL contiene ?edit=ID (link dalla email), apri il tab blog
   useEffect(() => {
@@ -710,7 +772,7 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette", "pdf", "blog", "recensioni", "statistiche", "forum"] as const).map((t) => (
+              {(["iscritti", "ricette", "pdf", "blog", "recensioni", "statistiche", "forum", "collaboratori"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => { setTab(t); if (t === "statistiche" && !stats) fetchStats(); }}
@@ -726,6 +788,7 @@ setAuthenticated(true);
                     : t === "blog" ? <BookOpen size={14} />
                     : t === "recensioni" ? <Star size={14} />
                     : t === "forum" ? <MessageCircle size={14} />
+                    : t === "collaboratori" ? <UserSquare2 size={14} />
                     : <BarChart2 size={14} />}
                   <span className="hidden sm:inline">
                     {t === "iscritti" ? "Iscritti"
@@ -734,6 +797,7 @@ setAuthenticated(true);
                       : t === "blog" ? "Blog"
                       : t === "recensioni" ? "Recensioni"
                       : t === "forum" ? "Forum"
+                      : t === "collaboratori" ? "Collaboratori"
                       : "Statistiche"}
                   </span>
                 </button>
@@ -1487,7 +1551,153 @@ setAuthenticated(true);
           </>
         )}
 
+        {/* ══ TAB: COLLABORATORI ══════════════════════════════════════ */}
+        {tab === "collaboratori" && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-white font-semibold text-lg">Gestione Collaboratori</h2>
+                <p className="text-gray-500 text-sm">{collaborators.length} collaboratori · la pagina pubblica è su /collaboratori</p>
+              </div>
+              <button onClick={openNewCollab} className="btn-primary text-sm px-5 py-2.5">
+                <Plus size={16} /> Nuovo collaboratore
+              </button>
+            </div>
+
+            {collabLoading ? (
+              <div className="flex justify-center py-20"><Loader2 className="text-brand-400 w-7 h-7 animate-spin" /></div>
+            ) : collaborators.length === 0 ? (
+              <div className="bg-dark-800 border border-dark-600 rounded-2xl px-6 py-16 text-center text-gray-600 text-sm">
+                Nessun collaboratore. Clicca &quot;Nuovo collaboratore&quot; per aggiungerne uno.
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {collaborators.map((c) => (
+                  <div key={c.id} className="bg-dark-800 border border-dark-600 rounded-2xl overflow-hidden hover:bg-dark-700/40 transition-colors">
+                    {c.photo_url ? (
+                      <img src={c.photo_url} alt={c.name} className="w-full h-40 object-cover" />
+                    ) : (
+                      <div className="w-full h-40 bg-dark-700 flex items-center justify-center">
+                        <UserSquare2 className="text-gray-600 w-10 h-10" />
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div>
+                          <div className="text-white font-semibold text-sm">{c.name}</div>
+                          {c.specialty && <div className="text-brand-400 text-xs">{c.specialty}</div>}
+                          {c.city && <div className="flex items-center gap-1 text-gray-500 text-xs mt-1"><MapPin size={10} />{c.city}</div>}
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => openEditCollab(c)} className="w-7 h-7 rounded-lg bg-dark-700 hover:bg-brand-500/20 text-gray-400 hover:text-brand-300 flex items-center justify-center transition-colors">
+                            <Pencil size={12} />
+                          </button>
+                          <button onClick={() => deleteCollab(c)} disabled={deletingCollabId === c.id} className="w-7 h-7 rounded-lg bg-dark-700 hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center transition-colors disabled:opacity-50">
+                            {deletingCollabId === c.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                          </button>
+                        </div>
+                      </div>
+                      {c.bio && <p className="text-gray-500 text-xs line-clamp-2 mt-2">{c.bio}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
       </div>{/* fine max-w-6xl */}
+
+      {/* ══ COLLABORATORE FORM MODAL ══════════════════════════════════ */}
+      {showCollabForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-800 border border-dark-600 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-dark-700">
+              <h3 className="text-white font-semibold text-lg">
+                {editingCollab ? "Modifica collaboratore" : "Nuovo collaboratore"}
+              </h3>
+              <button onClick={() => setShowCollabForm(false)} className="text-gray-400 hover:text-white transition-colors"><X size={20} /></button>
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+
+              {/* Foto */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Foto</label>
+                {collabForm.photo_url ? (
+                  <div className="relative w-24 h-24 mb-2">
+                    <img src={collabForm.photo_url} alt="Anteprima" className="w-24 h-24 rounded-xl object-cover" />
+                    <button onClick={() => setCollabForm((f) => ({ ...f, photo_url: "" }))} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 cursor-pointer w-fit bg-dark-700 hover:bg-dark-600 border border-dark-500 rounded-xl px-4 py-2 text-sm text-gray-400 transition-colors">
+                    {uploadingCollabPhoto ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                    {uploadingCollabPhoto ? "Caricamento..." : "Carica foto"}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadCollabPhoto(e.target.files[0]); }} />
+                  </label>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Nome *</label>
+                  <input type="text" value={collabForm.name} onChange={(e) => setCollabForm((f) => ({ ...f, name: e.target.value, slug: f.slug || toSlug(e.target.value) }))}
+                    placeholder="Mario Rossi"
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Slug URL</label>
+                  <input type="text" value={collabForm.slug} onChange={(e) => setCollabForm((f) => ({ ...f, slug: e.target.value }))}
+                    placeholder="mario-rossi"
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 text-sm" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Specialità</label>
+                  <input type="text" value={collabForm.specialty} onChange={(e) => setCollabForm((f) => ({ ...f, specialty: e.target.value }))}
+                    placeholder="Pizza napoletana"
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Città</label>
+                  <input type="text" value={collabForm.city} onChange={(e) => setCollabForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="Napoli"
+                    className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 text-sm" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Bio</label>
+                <textarea rows={3} value={collabForm.bio} onChange={(e) => setCollabForm((f) => ({ ...f, bio: e.target.value }))}
+                  placeholder="Breve descrizione della persona..."
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500 text-sm resize-none" />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button onClick={() => setCollabForm((f) => ({ ...f, active: !f.active }))} className="text-gray-400 hover:text-white transition-colors">
+                  {collabForm.active ? <ToggleRight size={24} className="text-brand-400" /> : <ToggleLeft size={24} />}
+                </button>
+                <span className="text-sm text-gray-400">{collabForm.active ? "Visibile sul sito" : "Nascosto"}</span>
+              </div>
+
+              {collabError && <p className="text-red-400 text-sm">{collabError}</p>}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowCollabForm(false)} className="flex-1 bg-dark-700 hover:bg-dark-600 text-gray-300 font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors">
+                  Annulla
+                </button>
+                <button onClick={saveCollab} disabled={savingCollab} className="flex-1 btn-primary disabled:opacity-70">
+                  {savingCollab ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  {editingCollab ? "Salva modifiche" : "Crea collaboratore"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ TESTIMONIAL FORM MODAL ═══════════════════════════════════ */}
       {showTestiForm && (

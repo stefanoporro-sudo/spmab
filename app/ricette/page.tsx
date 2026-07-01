@@ -14,6 +14,7 @@ type Recipe = {
   image_url: string;
   active: boolean;
   sort_order: number;
+  collaborators: { id: string; name: string; slug: string } | null;
 };
 
 const levelColor: Record<string, string> = {
@@ -108,6 +109,12 @@ export default function RicettePage() {
                   </h3>
                   {r.description && (
                     <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">{r.description}</p>
+                  )}
+                  {r.collaborators && (
+                    <Link href={`/collaboratori/${r.collaborators.slug}`}
+                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors mt-auto">
+                      di {r.collaborators.name}
+                    </Link>
                   )}
 
                   {r.file_url ? (
