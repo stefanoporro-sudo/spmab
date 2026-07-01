@@ -13,6 +13,7 @@ type Subscriber = { id: string; name: string; email: string; subscribed_at: stri
 type Recipe = {
   id: string; title: string; category: string; description: string;
   level: string; file_url: string; image_url: string; active: boolean; sort_order: number;
+  collaborator_id: string | null;
 };
 type RecipeForm = Omit<Recipe, "id">;
 type Post = {
@@ -55,7 +56,7 @@ function referrerName(ref: string | null): string {
 
 const emptyRecipe: RecipeForm = {
   title: "", category: "Pizza", description: "", level: "Base",
-  file_url: "", image_url: "", active: true, sort_order: 99,
+  file_url: "", image_url: "", active: true, sort_order: 99, collaborator_id: null,
 };
 const emptyPost: PostForm = {
   title: "", slug: "", excerpt: "", content: "",
@@ -406,7 +407,7 @@ setAuthenticated(true);
   };
 
   useEffect(() => {
-    if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); }
+    if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); fetchCollaborators(); }
     if (authenticated && tab === "pdf") fetchPdfFiles();
     if (authenticated && tab === "blog") fetchPosts();
     if (authenticated && tab === "recensioni") fetchTestimonials();
@@ -533,7 +534,7 @@ setAuthenticated(true);
     setEditingRecipe(r);
     setRecipeForm({
       title: r.title, category: r.category, description: r.description,
-      level: r.level, file_url: r.file_url, image_url: r.image_url ?? "", active: r.active, sort_order: r.sort_order,
+      level: r.level, file_url: r.file_url, image_url: r.image_url ?? "", active: r.active, sort_order: r.sort_order, collaborator_id: r.collaborator_id ?? null,
     });
     setRecipeError("");
     setShowForm(true);
@@ -2057,6 +2058,20 @@ setAuthenticated(true);
                     {LEVELS.map((l) => <option key={l} value={l} className="bg-dark-700">{l}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Autore</label>
+                <select
+                  value={recipeForm.collaborator_id ?? ""}
+                  onChange={(e) => setRecipeForm({ ...recipeForm, collaborator_id: e.target.value || null })}
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                >
+                  <option value="" className="bg-dark-700">👨‍🍳 Stefano Porro (tu)</option>
+                  {collaborators.map((c) => (
+                    <option key={c.id} value={c.id} className="bg-dark-700">{c.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>

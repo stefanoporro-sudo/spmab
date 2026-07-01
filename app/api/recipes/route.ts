@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { title, category, description, level, file_url, active, sort_order } = body;
+  const { title, category, description, level, file_url, active, sort_order, collaborator_id } = body;
 
   if (!title || !category) {
     return NextResponse.json({ error: "Titolo e categoria sono obbligatori" }, { status: 400 });
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("recipes")
-    .insert({ title, category, description, level, file_url, active: active ?? true, sort_order: sort_order ?? 99 })
+    .insert({ title, category, description, level, file_url, active: active ?? true, sort_order: sort_order ?? 99, collaborator_id: collaborator_id ?? null })
     .select()
     .single();
 

@@ -110,11 +110,13 @@ export default function RicettePage() {
                   {r.description && (
                     <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">{r.description}</p>
                   )}
-                  {r.collaborators && (
+                  {r.collaborators ? (
                     <Link href={`/collaboratori/${r.collaborators.slug}`}
-                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors mt-auto">
+                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
                       di {r.collaborators.name}
                     </Link>
+                  ) : (
+                    <span className="text-xs text-gray-600">di Stefano Porro</span>
                   )}
 
                   {r.file_url ? (
