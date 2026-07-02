@@ -25,6 +25,12 @@ export async function GET(req: NextRequest) {
   const meRes = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${token}`);
   const me = await meRes.json();
 
+  const accountsRes = await fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token=${token}`);
+  const accountsRaw = await accountsRes.json();
+  const accounts = {
+    data: (accountsRaw.data ?? []).map((a: Record<string, unknown>) => ({ id: a.id, name: a.name, has_access_token: !!a.access_token })),
+  };
+
   let debugToken = null;
   if (appId && appSecret) {
     const debugRes = await fetch(
@@ -33,5 +39,5 @@ export async function GET(req: NextRequest) {
     debugToken = await debugRes.json();
   }
 
-  return NextResponse.json({ pageId, igUserId, me, perms, debugToken });
+  return NextResponse.json({ pageId, igUserId, me, perms, accounts, debugToken });
 }
