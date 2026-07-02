@@ -74,15 +74,28 @@ async function publishToInstagram(imageUrl: string, caption: string) {
   return publishData;
 }
 
+async function getPageAccessToken(pageId: string, userToken: string): Promise<string> {
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${pageId}?fields=access_token&access_token=${userToken}`
+  );
+  const data = await res.json();
+  if (!res.ok || !data.access_token) throw classifyMetaError("fb_page_token", data);
+  return data.access_token;
+}
+
 async function publishToFacebook(imageUrl: string, caption: string) {
   const pageId = process.env.META_PAGE_ID;
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-  if (!pageId || !token) throw new MetaApiError("fb_config", "other", null, "META_PAGE_ID o META_PAGE_ACCESS_TOKEN mancanti");
+  const userToken = process.env.META_PAGE_ACCESS_TOKEN;
+  if (!pageId || !userToken) throw new MetaApiError("fb_config", "other", null, "META_PAGE_ID o META_PAGE_ACCESS_TOKEN mancanti");
+
+  // La Pagina è gestita tramite un portfolio business: /me/accounts non la restituisce,
+  // va richiesto il suo access_token direttamente sul nodo della Pagina.
+  const pageToken = await getPageAccessToken(pageId, userToken);
 
   const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${pageId}/photos`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: imageUrl, caption, access_token: token }),
+    body: JSON.stringify({ url: imageUrl, caption, access_token: pageToken }),
   });
   const data = await res.json();
   if (!res.ok) throw classifyMetaError("fb_publish", data);
