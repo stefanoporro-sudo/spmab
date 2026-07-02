@@ -31,6 +31,20 @@ export async function GET(req: NextRequest) {
     data: (accountsRaw.data ?? []).map((a: Record<string, unknown>) => ({ id: a.id, name: a.name, has_access_token: !!a.access_token })),
   };
 
+  let pageDirect: unknown = null;
+  if (pageId) {
+    const pageDirectRes = await fetch(
+      `https://graph.facebook.com/v21.0/${pageId}?fields=name,access_token&access_token=${token}`
+    );
+    const pageDirectRaw = await pageDirectRes.json();
+    pageDirect = {
+      ok: pageDirectRes.ok,
+      name: pageDirectRaw.name,
+      has_access_token: !!pageDirectRaw.access_token,
+      error: pageDirectRaw.error ?? null,
+    };
+  }
+
   let debugToken = null;
   if (appId && appSecret) {
     const debugRes = await fetch(
@@ -39,5 +53,5 @@ export async function GET(req: NextRequest) {
     debugToken = await debugRes.json();
   }
 
-  return NextResponse.json({ pageId, igUserId, me, perms, accounts, debugToken });
+  return NextResponse.json({ pageId, igUserId, me, perms, accounts, pageDirect, debugToken });
 }
