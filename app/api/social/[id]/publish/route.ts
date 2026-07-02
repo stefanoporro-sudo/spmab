@@ -179,7 +179,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     updateData.published_at = new Date().toISOString();
   }
 
-  await supabase.from("social_posts").update(updateData).eq("id", id);
+  const { error: updateError } = await supabase.from("social_posts").update(updateData).eq("id", id);
+  if (updateError) {
+    console.error("Social publish update error:", updateError);
+    return NextResponse.json({ error: "Pubblicato ma salvataggio stato fallito", detail: updateError.message }, { status: 500 });
+  }
 
   return NextResponse.json({ instagram: results.instagram, facebook: results.facebook, status: finalStatus });
 }
