@@ -180,6 +180,7 @@ const data = await res.json();
 if (res.status === 401) { setAuthError("Password errata. Riprova."); return; }
 if (!res.ok) { setAuthError(`Errore server: ${data.error ?? res.status}`); return; }
 setSubscribers(data.subscribers);
+localStorage.setItem("spmab_admin", "1");
 setAuthenticated(true);
   };
 
@@ -806,7 +807,7 @@ setAuthenticated(true);
             </div>
           </div>
           <button
-            onClick={() => { setAuthenticated(false); setSubscribers([]); setPassword(""); }}
+            onClick={() => { localStorage.removeItem("spmab_admin"); setAuthenticated(false); setSubscribers([]); setPassword(""); }}
             className="flex items-center gap-2 text-gray-400 hover:text-red-400 text-sm transition-colors"
           >
             <LogOut size={15} />

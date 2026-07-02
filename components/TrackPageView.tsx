@@ -9,6 +9,8 @@ export default function TrackPageView() {
   useEffect(() => {
     // Ignora visite dalla pagina admin
     if (pathname.startsWith("/admin")) return;
+    // Ignora visite di Stefano (loggato come admin)
+    if (typeof window !== "undefined" && localStorage.getItem("spmab_admin") === "1") return;
 
     fetch("/api/track", {
       method: "POST",
