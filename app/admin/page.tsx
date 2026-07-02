@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Users, Lock, LogOut, Download, Search, RefreshCw,
   ChefHat, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, FileText,
-  BookOpen, Eye, EyeOff, Star, BarChart2, Globe, Clock, TrendingUp, MessageCircle, Pin, Send, UserSquare2, MapPin, Upload,
+  BookOpen, Eye, EyeOff, Star, BarChart2, Globe, Clock, TrendingUp, MessageCircle, Pin, Send, UserSquare2, MapPin, Upload, Share2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,6 +21,14 @@ type Post = {
   category: string; cover_url: string; published: boolean; published_at: string; created_at: string;
 };
 type PostForm = Omit<Post, "id" | "published_at" | "created_at">;
+type SocialPost = {
+  id: string; source_type: "post" | "recipe"; source_id: string;
+  caption: string; image_url: string; scheduled_slot: string;
+  status: "draft" | "approved" | "publishing" | "published" | "failed" | "rejected";
+  platforms: string[];
+  ig_result: Record<string, unknown> | null; fb_result: Record<string, unknown> | null;
+  error_message: string | null; created_at: string;
+};
 type Testimonial = { id: string; name: string; role: string; stars: number; text: string; active: boolean; sort_order: number };
 type TestimonialForm = Omit<Testimonial, "id">;
 type ForumThread = { id: string; title: string; body: string; author_name: string; author_email: string; visible: boolean; pinned: boolean; created_at: string; reply_count: number };
@@ -85,7 +93,7 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "recensioni" | "statistiche" | "forum" | "collaboratori">("iscritti");
+  const [tab, setTab] = useState<"iscritti" | "ricette" | "pdf" | "blog" | "social" | "recensioni" | "statistiche" | "forum" | "collaboratori">("iscritti");
   const [stats, setStats] = useState<StatsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -126,6 +134,19 @@ export default function AdminPage() {
   const [deletingPdf, setDeletingPdf] = useState<string | null>(null);
   // Apertura diretta di un articolo via link email (/admin?edit=ID)
   const [pendingEditId, setPendingEditId] = useState<string | null>(null);
+
+  // ── Social state ──
+  const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]);
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [savingSocialId, setSavingSocialId] = useState<string | null>(null);
+  const [uploadingSocialId, setUploadingSocialId] = useState<string | null>(null);
+  const [publishingSocialId, setPublishingSocialId] = useState<string | null>(null);
+  const [deletingSocialId, setDeletingSocialId] = useState<string | null>(null);
+  const [socialError, setSocialError] = useState("");
+  const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
+  const [captionDraft, setCaptionDraft] = useState("");
+  // Apertura diretta di un post social via link email (/admin?tab=social&edit=ID)
+  const [pendingSocialEditId, setPendingSocialEditId] = useState<string | null>(null);
 
   // ── Testimonials state ───────────────────────────────────────────
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -258,6 +279,58 @@ setAuthenticated(true);
     setPosts(data.posts ?? []);
     setPostsLoading(false);
   }, [password]);
+
+  // ── Fetch social posts ───────────────────────────────────────────
+  const fetchSocialPosts = useCallback(async () => {
+    setSocialLoading(true);
+    const res = await fetch("/api/social", { headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setSocialPosts(data.posts ?? []);
+    setSocialLoading(false);
+  }, [password]);
+
+  const updateSocialPost = async (id: string, patch: Record<string, unknown>) => {
+    setSavingSocialId(id);
+    setSocialError("");
+    const res = await fetch(`/api/social/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify(patch),
+    });
+    setSavingSocialId(null);
+    if (!res.ok) { setSocialError("Errore nel salvataggio."); return; }
+    fetchSocialPosts();
+  };
+
+  const uploadSocialImage = async (id: string, file: File) => {
+    setUploadingSocialId(id);
+    setSocialError("");
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/social/upload", { method: "POST", headers: { "x-admin-password": password }, body: fd });
+    const data = await res.json();
+    if (!res.ok) { setUploadingSocialId(null); setSocialError(data.error ?? "Errore nel caricamento immagine."); return; }
+    await updateSocialPost(id, { image_url: data.url });
+    setUploadingSocialId(null);
+  };
+
+  const publishSocialPost = async (id: string) => {
+    setPublishingSocialId(id);
+    setSocialError("");
+    const res = await fetch(`/api/social/${id}/publish`, { method: "POST", headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setPublishingSocialId(null);
+    if (!res.ok) setSocialError(data.error ?? "Errore nella pubblicazione.");
+    fetchSocialPosts();
+  };
+
+  const deleteSocialPost = async (id: string) => {
+    if (!confirm("Rifiutare ed eliminare questa bozza?")) return;
+    setDeletingSocialId(id);
+    await fetch(`/api/social/${id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+    setDeletingSocialId(null);
+    fetchSocialPosts();
+  };
 
   // ── Delete PDF ───────────────────────────────────────────────────
   const deletePdf = async (name: string) => {
@@ -411,15 +484,19 @@ setAuthenticated(true);
     if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); fetchCollaborators(); }
     if (authenticated && tab === "pdf") fetchPdfFiles();
     if (authenticated && tab === "blog") fetchPosts();
+    if (authenticated && tab === "social") fetchSocialPosts();
     if (authenticated && tab === "recensioni") fetchTestimonials();
     if (authenticated && tab === "forum") fetchForumThreads();
     if (authenticated && tab === "collaboratori") fetchCollaborators();
-  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchTestimonials, fetchForumThreads, fetchCollaborators]);
+  }, [authenticated, tab, fetchRecipes, fetchPdfFiles, fetchPosts, fetchSocialPosts, fetchTestimonials, fetchForumThreads, fetchCollaborators]);
 
-  // Se l'URL contiene ?edit=ID (link dalla email), apri il tab blog
+  // Se l'URL contiene ?edit=ID (link dalla email), apri il tab blog o social
   useEffect(() => {
-    const editId = new URLSearchParams(window.location.search).get("edit");
-    if (editId) { setPendingEditId(editId); setTab("blog"); }
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get("edit");
+    if (!editId) return;
+    if (params.get("tab") === "social") { setPendingSocialEditId(editId); setTab("social"); }
+    else { setPendingEditId(editId); setTab("blog"); }
   }, []);
 
   // Quando gli articoli sono caricati, apri direttamente quello richiesto dal link
@@ -430,6 +507,13 @@ setAuthenticated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticated, posts, pendingEditId]);
+
+  // Quando i post social sono caricati, evidenzia quello richiesto dal link email
+  useEffect(() => {
+    if (authenticated && pendingSocialEditId && socialPosts.length) {
+      document.getElementById(`social-${pendingSocialEditId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [authenticated, socialPosts, pendingSocialEditId]);
 
   // ── Testimonial helpers ──────────────────────────────────────────
   const openNewTesti = () => { setEditingTesti(null); setTestiForm(emptyTestimonial); setTestiError(""); setShowTestiForm(true); };
@@ -774,7 +858,7 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette", "pdf", "blog", "recensioni", "statistiche", "forum", "collaboratori"] as const).map((t) => (
+              {(["iscritti", "ricette", "pdf", "blog", "social", "recensioni", "statistiche", "forum", "collaboratori"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => { setTab(t); if (t === "statistiche" && !stats) fetchStats(); }}
@@ -788,6 +872,7 @@ setAuthenticated(true);
                     : t === "ricette" ? <ChefHat size={14} />
                     : t === "pdf" ? <FileText size={14} />
                     : t === "blog" ? <BookOpen size={14} />
+                    : t === "social" ? <Share2 size={14} />
                     : t === "recensioni" ? <Star size={14} />
                     : t === "forum" ? <MessageCircle size={14} />
                     : t === "collaboratori" ? <UserSquare2 size={14} />
@@ -797,6 +882,7 @@ setAuthenticated(true);
                       : t === "ricette" ? "Ricette"
                       : t === "pdf" ? "PDF"
                       : t === "blog" ? "Blog"
+                      : t === "social" ? "Social"
                       : t === "recensioni" ? "Recensioni"
                       : t === "forum" ? "Forum"
                       : t === "collaboratori" ? "Collaboratori"
@@ -1200,6 +1286,174 @@ setAuthenticated(true);
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ══ TAB: SOCIAL ═══════════════════════════════════════════ */}
+        {tab === "social" && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-white font-semibold text-lg">Post Social</h2>
+                <p className="text-gray-500 text-sm">
+                  {socialPosts.filter((p) => p.status === "draft").length} da revisionare · {socialPosts.filter((p) => p.status === "published").length} pubblicati
+                </p>
+              </div>
+              <button onClick={fetchSocialPosts} disabled={socialLoading} className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50">
+                <RefreshCw size={14} className={socialLoading ? "animate-spin" : ""} /> Aggiorna
+              </button>
+            </div>
+
+            {socialError && (
+              <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-3">{socialError}</div>
+            )}
+
+            {socialLoading ? (
+              <div className="flex justify-center py-20"><Loader2 className="text-brand-400 w-7 h-7 animate-spin" /></div>
+            ) : socialPosts.length === 0 ? (
+              <div className="px-6 py-16 text-center text-gray-600 text-sm bg-dark-800 border border-dark-600 rounded-2xl">
+                Nessun post social ancora. Le bozze arrivano automaticamente 3 volte al giorno.
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-4">
+                {socialPosts.map((p) => {
+                  const highlighted = pendingSocialEditId === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      id={`social-${p.id}`}
+                      className={`bg-dark-800 border rounded-2xl p-4 flex flex-col gap-3 ${highlighted ? "border-brand-500 ring-2 ring-brand-500/40" : "border-dark-600"}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                          p.status === "published" ? "bg-green-500/15 text-green-300"
+                            : p.status === "approved" ? "bg-blue-500/15 text-blue-300"
+                            : p.status === "failed" ? "bg-red-500/15 text-red-300"
+                            : p.status === "rejected" ? "bg-gray-500/15 text-gray-500"
+                            : "bg-yellow-500/15 text-yellow-300"
+                        }`}>
+                          {p.status === "published" ? "Pubblicato"
+                            : p.status === "approved" ? "Approvato"
+                            : p.status === "failed" ? "Errore"
+                            : p.status === "rejected" ? "Rifiutato"
+                            : "Bozza"}
+                        </span>
+                        <span className="text-gray-500 text-xs">{p.scheduled_slot} · {p.source_type === "post" ? "📝 Articolo" : "🍕 Ricetta"}</span>
+                      </div>
+
+                      {p.image_url ? (
+                        <div className="relative rounded-xl overflow-hidden border border-dark-500 group">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={p.image_url} alt="Immagine post" className="w-full h-48 object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => updateSocialPost(p.id, { image_url: "" })}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-500/80 text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                            title="Rimuovi immagine"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer flex items-center justify-center gap-2 bg-dark-700 border border-dashed border-dark-400 hover:border-brand-500 rounded-xl px-4 py-6 transition-colors group">
+                          {uploadingSocialId === p.id ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin text-brand-400" />
+                              <span className="text-gray-400 text-sm">Caricamento...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={16} className="text-gray-500 group-hover:text-brand-400 transition-colors" />
+                              <span className="text-gray-400 group-hover:text-gray-300 text-sm">Carica immagine (foto reale o generata)</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={uploadingSocialId === p.id}
+                            onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadSocialImage(p.id, file); e.target.value = ""; }}
+                          />
+                        </label>
+                      )}
+
+                      {editingCaptionId === p.id ? (
+                        <textarea
+                          rows={5}
+                          value={captionDraft}
+                          onChange={(e) => setCaptionDraft(e.target.value)}
+                          className="w-full bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-white text-sm resize-none focus:outline-none focus:border-brand-500"
+                        />
+                      ) : (
+                        <p className="text-gray-300 text-sm whitespace-pre-wrap line-clamp-6">{p.caption}</p>
+                      )}
+
+                      {p.status === "failed" && p.error_message && (
+                        <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-lg px-3 py-2">{p.error_message}</div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {editingCaptionId === p.id ? (
+                          <>
+                            <button
+                              onClick={() => { updateSocialPost(p.id, { caption: captionDraft }); setEditingCaptionId(null); }}
+                              disabled={savingSocialId === p.id}
+                              className="btn-primary text-xs px-3 py-1.5"
+                            >
+                              Salva testo
+                            </button>
+                            <button onClick={() => setEditingCaptionId(null)} className="border border-dark-500 text-gray-400 rounded-lg px-3 py-1.5 text-xs">
+                              Annulla
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingCaptionId(p.id); setCaptionDraft(p.caption); }}
+                            className="border border-dark-500 text-gray-400 hover:text-white rounded-lg px-3 py-1.5 text-xs transition-colors"
+                          >
+                            <Pencil size={12} className="inline mr-1" /> Modifica testo
+                          </button>
+                        )}
+
+                        {(p.status === "draft" || p.status === "rejected") && (
+                          <button
+                            onClick={() => updateSocialPost(p.id, { status: "approved" })}
+                            disabled={!p.image_url || savingSocialId === p.id}
+                            className="bg-green-600 hover:bg-green-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
+                            title={!p.image_url ? "Carica prima un'immagine" : undefined}
+                          >
+                            <Check size={12} className="inline mr-1" /> Approva
+                          </button>
+                        )}
+
+                        {(p.status === "approved" || p.status === "failed") && (
+                          <button
+                            onClick={() => publishSocialPost(p.id)}
+                            disabled={publishingSocialId === p.id}
+                            className="bg-brand-500 hover:bg-brand-400 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                          >
+                            {publishingSocialId === p.id
+                              ? <Loader2 size={12} className="inline animate-spin mr-1" />
+                              : <Send size={12} className="inline mr-1" />}
+                            {p.status === "failed" ? "Riprova pubblicazione" : "Pubblica ora"}
+                          </button>
+                        )}
+
+                        {p.status !== "published" && (
+                          <button
+                            onClick={() => deleteSocialPost(p.id)}
+                            disabled={deletingSocialId === p.id}
+                            className="border border-dark-500 text-gray-500 hover:text-red-400 hover:border-red-500/40 rounded-lg px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
+                          >
+                            {deletingSocialId === p.id ? <Loader2 size={12} className="inline animate-spin" /> : "Rifiuta"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>

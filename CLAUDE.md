@@ -9,11 +9,16 @@
 
 ## Variabili d'ambiente (su Vercel)
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY` — database
-- `ANTHROPIC_API_KEY` — generazione articoli blog
+- `ANTHROPIC_API_KEY` — generazione articoli blog e caption social
 - `RESEND_API_KEY` — invio email
 - `FROM_EMAIL` — mittente email
 - `ADMIN_PASSWORD` — `Spmab2024!` — protegge le API admin
 - `CRON_SECRET` — usato da Vercel per i cron job
+- `META_APP_ID`, `META_APP_SECRET` — app Meta for Developers (usati per il controllo scadenza token)
+- `META_PAGE_ACCESS_TOKEN` — Page Access Token long-lived (60 giorni) per Graph API
+- `META_PAGE_ID` — ID della Pagina Facebook collegata
+- `META_IG_USER_ID` — ID dell'account Instagram Business collegato alla Pagina
+- `SOCIAL_DRY_RUN` — se `true`, la pubblicazione social simula il successo senza chiamare davvero Meta (solo per test)
 
 ## Autenticazione admin
 Le API admin accettano l'header `x-admin-password: Spmab2024!`.
@@ -29,6 +34,7 @@ Tre sistemi in parallelo per massima affidabilità:
 |-----|----------|--------|
 | Articolo blog | `/api/cron/blog` | lun-ven 8:30 CEST |
 | Report statistiche | `/api/cron/daily-report` | ogni giorno 9:00 CEST |
+| Bozza post social | `/api/cron/social?slot=11:00\|16:00\|19:00` | ogni giorno 11:00, 16:00, 19:00 CEST — trigger da **cron-job.org** (non vercel.json, gestisce nativamente il cambio ora legale) |
 
 Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e genera l'articolo in background. L'email con la bozza arriva a **porroste80@gmail.com**.
 
@@ -39,10 +45,17 @@ Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e
 - `page_views` — visite al sito
 - `forum_threads` — discussioni community
 - `forum_replies` — risposte forum
+- `social_posts` — bozze di post Instagram/Facebook (caption generata da Claude, immagine caricata a mano, stati `draft/approved/publishing/published/failed/rejected`)
 
 ## Storage Supabase (bucket)
 - `blog` — copertine articoli (PNG 1600×840)
 - `ricette` — immagini ricette (JPG/PNG/WebP, max 5MB, consigliato 800×450px)
+- `social` — immagini dei post social (JPG/PNG/WebP, max 8MB)
+
+## Integrazione social (Instagram/Facebook)
+Il cron `/api/cron/social` genera 3 volte al giorno una bozza di caption (alternando articoli blog e ricette pubblicate) e la salva in `social_posts` con `status: draft`. **Non genera immagini automaticamente**: Stefano carica a mano una foto reale (o generata su richiesta in chat con Claude) dal pannello `/admin` → tab **Social**, prima di poter approvare. Solo dopo l'approvazione esplicita, il bottone "Pubblica ora" chiama `/api/social/[id]/publish`, che pubblica su Instagram e Facebook via Meta Graph API — nessuna pubblicazione è mai automatica.
+
+Il Page Access Token Meta scade ogni 60 giorni: il cron `daily-report` controlla la scadenza (`debug_token`) e invia un'email di avviso se mancano meno di 7 giorni.
 
 ## Regole contenuto importanti
 - Usare sempre **"fermentazione"** — mai "maturazione"

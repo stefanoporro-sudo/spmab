@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+// Controlla la scadenza del token Meta (Instagram/Facebook) e avvisa se manca poco
+async function checkMetaTokenExpiry() {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  const pageToken = process.env.META_PAGE_ACCESS_TOKEN;
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!appId || !appSecret || !pageToken || !resendKey) return;
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/debug_token?input_token=${pageToken}&access_token=${appId}|${appSecret}`
+    );
+    const data = await res.json();
+    const expiresAt: number = data?.data?.expires_at ?? 0;
+    if (!expiresAt) return; // 0 = token senza scadenza
+
+    const daysLeft = Math.floor((expiresAt * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+    if (daysLeft > 7) return;
+
+    const fromEmail = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `Social Consulenza Pizzaiolo <${fromEmail}>`,
+        to: [process.env.ADMIN_EMAIL ?? "porroste80@gmail.com"],
+        subject: `⚠️ Token Meta in scadenza tra ${daysLeft} giorni`,
+        html: `<p>Il token di accesso a Instagram/Facebook (<code>META_PAGE_ACCESS_TOKEN</code>) scade tra <strong>${daysLeft} giorni</strong>.</p>
+<p>Rigeneralo da <a href="https://developers.facebook.com">developers.facebook.com</a> → Graph API Explorer, e aggiorna la variabile su Vercel.</p>`,
+      }),
+    });
+  } catch (e) {
+    console.error("[daily-report] Controllo token Meta fallito:", e);
+  }
+}
+
 // Nomi leggibili per le pagine
 const PAGE_LABELS: Record<string, string> = {
   "/": "🏠 Homepage",
@@ -277,6 +313,8 @@ export async function GET(req: NextRequest) {
     console.error("Resend error:", err);
     return NextResponse.json({ error: "Errore invio email", detail: err }, { status: 500 });
   }
+
+  await checkMetaTokenExpiry();
 
   return NextResponse.json({
     ok: true,
