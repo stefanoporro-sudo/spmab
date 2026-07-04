@@ -127,12 +127,12 @@ export default function AiosPage() {
 
             <section className="mb-8">
               <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">Founder</h2>
-              <pre className="bg-white border rounded-lg p-4 text-sm whitespace-pre-wrap font-sans">{data.context.founder || "—"}</pre>
+              <pre className="bg-white border rounded-lg p-4 text-sm whitespace-pre-wrap font-sans text-gray-800">{data.context.founder || "—"}</pre>
             </section>
 
             <section>
               <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">App mobile</h2>
-              <pre className="bg-white border rounded-lg p-4 text-sm whitespace-pre-wrap font-sans">{data.context.appMobile || "—"}</pre>
+              <pre className="bg-white border rounded-lg p-4 text-sm whitespace-pre-wrap font-sans text-gray-800">{data.context.appMobile || "—"}</pre>
             </section>
           </>
         )}
