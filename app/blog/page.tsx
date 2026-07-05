@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, BookOpen, Loader2 } from "lucide-react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import TopMese from "@/components/TopMese";
 
 type Post = {
   id: string;
@@ -107,6 +108,9 @@ export default function BlogPage() {
             </div>
           ) : (
             <div className="space-y-10">
+
+              {/* Top del mese */}
+              <TopMese />
 
               {/* Articolo in evidenza */}
               {featured && (
