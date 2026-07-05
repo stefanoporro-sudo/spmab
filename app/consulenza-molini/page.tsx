@@ -77,6 +77,14 @@ const risultati = [
   { numero: "2", label: "tipologie di molini seguiti: industriali e artigianali con grano 100% italiano" },
 ];
 
+const casoStudio = [
+  { periodo: "Mesi 1–3", titolo: "Analisi tecnica", desc: "Analisi completa delle farine esistenti: forza, assorbimento, tenacia.", icon: BarChart3 },
+  { periodo: "Mesi 4–5", titolo: "Test di prodotto", desc: "Differenziazione delle farine in base allo stile di pizza: napoletana, romana, in teglia.", icon: Wheat },
+  { periodo: "Mese 6", titolo: "Lancio", desc: "I clienti storici del mulino riconoscono subito il miglioramento rispetto al prodotto precedente.", icon: Zap },
+  { periodo: "Mesi 6–12", titolo: "Crescita", desc: "Aumento della produttività e ingresso in distributori locali in tutta Italia.", icon: TrendingUp },
+  { periodo: "Dopo 1 anno", titolo: "Mercato consolidato", desc: "Risultati concreti sia sul mercato italiano che su quello estero.", icon: Handshake },
+];
+
 const faqItems = [
   {
     q: "Lavori solo con molini di grandi dimensioni?",
@@ -153,6 +161,48 @@ export default function ConsulenzaMoliniPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── CASO STUDIO ──────────────────────────────────────────── */}
+      <section className="py-24 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-14">
+            <p className="section-subtitle mb-4">Un caso reale</p>
+            <h2 className="section-title text-white mb-4">
+              Da fornitore di forni<br />
+              <span className="gradient-text">a protagonista nel mercato pizza.</span>
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Un mulino industriale italiano, già fornitore di grandi catene di forni, voleva entrare
+              nel mercato pizza. Il prodotto di partenza era già solido — mancava la specializzazione.
+            </p>
+          </div>
+
+          <div className="relative">
+            <div className="absolute left-5 top-2 bottom-2 w-px bg-gradient-to-b from-brand-500/60 via-brand-500/30 to-transparent" />
+            <div className="flex flex-col gap-6">
+              {casoStudio.map((step) => (
+                <div key={step.titolo} className="flex gap-5 items-start">
+                  <div className="relative z-10 w-10 h-10 rounded-full bg-dark-800 border-2 border-brand-500 flex items-center justify-center shrink-0">
+                    <step.icon className="text-brand-400 w-4 h-4" />
+                  </div>
+                  <div className="card flex-1 hover:border-brand-500/30 transition-all duration-300">
+                    <span className="text-brand-400 text-xs font-mono font-bold uppercase tracking-wide">
+                      {step.periodo}
+                    </span>
+                    <h3 className="text-white font-semibold text-lg mt-1 mb-2">{step.titolo}</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed">{step.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-gray-500 text-center italic mt-10 max-w-xl mx-auto">
+            Nessun cambio di grano, nessuna rivoluzione di prodotto — solo il lavoro di individuare
+            cosa cercava davvero il pizzaiolo e costruire la farina intorno a quella risposta.
+          </p>
         </div>
       </section>
 
