@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import LikeButton from "@/components/LikeButton";
+import ShareButton from "@/components/ShareButton";
 
 type Post = {
   id: string;
@@ -249,8 +250,12 @@ export default async function BlogPostPage({
 
           {/* Footer articolo */}
           <div className="mt-14 pt-8 border-t border-dark-600">
-            <div className="mb-6">
+            <div className="mb-6 flex items-center gap-3 flex-wrap">
               <LikeButton type="post" id={post.id} initialCount={post.likes_count ?? 0} />
+              <ShareButton
+                title={post.title}
+                url={`https://www.consulenzapizzaiolo.it/blog/${post.slug}`}
+              />
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="flex items-center gap-4">
