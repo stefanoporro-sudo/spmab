@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   const { name, email, phone, service, message } = await req.json();
@@ -6,6 +7,13 @@ export async function POST(req: NextRequest) {
   if (!name || !email || !message) {
     return NextResponse.json({ error: "Campi obbligatori mancanti" }, { status: 400 });
   }
+
+  // Salva la richiesta su Supabase prima di tutto, così il lead non si perde
+  // anche se l'invio email dovesse fallire per qualche motivo
+  const { error: dbError } = await supabase
+    .from("contact_requests")
+    .insert({ name, email, phone, service, message });
+  if (dbError) console.error("[contact] Errore salvataggio Supabase:", dbError);
 
   const resendKey = process.env.RESEND_API_KEY;
   const adminEmail = process.env.ADMIN_EMAIL ?? "stefano@consulenzapizzaiolo.it";

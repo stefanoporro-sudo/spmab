@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     { count: viewsThisMonth },
     { count: socialDrafts },
     { count: forumThreads },
+    { count: contactRequests },
   ] = await Promise.all([
     supabase.from("posts").select("*", { count: "exact", head: true }),
     supabase.from("posts").select("*", { count: "exact", head: true }).eq("published", true),
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
     supabase.from("page_views").select("*", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
     supabase.from("social_posts").select("*", { count: "exact", head: true }).eq("status", "draft"),
     supabase.from("forum_threads").select("*", { count: "exact", head: true }),
+    supabase.from("contact_requests").select("*", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
   ]);
 
   return NextResponse.json({
@@ -48,6 +50,7 @@ export async function GET(req: NextRequest) {
       viewsThisMonth: viewsThisMonth ?? 0,
       socialDrafts: socialDrafts ?? 0,
       forumThreads: forumThreads ?? 0,
+      contactRequestsThisMonth: contactRequests ?? 0,
       generatedAt: new Date().toISOString(),
     },
     context: {

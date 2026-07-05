@@ -36,6 +36,7 @@ const [
   viewsThisMonth,
   socialDrafts,
   forumThreads,
+  contactRequestsThisMonth,
 ] = await Promise.all([
   count("posts"),
   count("posts", (q) => q.eq("published", true)),
@@ -44,6 +45,7 @@ const [
   count("page_views", (q) => q.gte("created_at", startOfMonth.toISOString())),
   count("social_posts", (q) => q.eq("status", "draft")),
   count("forum_threads"),
+  count("contact_requests", (q) => q.gte("created_at", startOfMonth.toISOString())),
 ]);
 
 const now = new Date().toLocaleString("it-IT", { timeZone: "Europe/Rome" });
@@ -58,6 +60,7 @@ _Generato automaticamente il ${now} da \`scripts/generate-metrics.mjs\`. Non mod
 - Visite sito questo mese: **${viewsThisMonth}**
 - Bozze social in attesa di approvazione: **${socialDrafts}**
 - Discussioni community: **${forumThreads}**
+- Richieste di consulenza questo mese: **${contactRequestsThisMonth}**
 `;
 
 writeFileSync(new URL("../.claude/context/metrics.md", import.meta.url), md);

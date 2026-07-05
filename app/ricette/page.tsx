@@ -171,6 +171,20 @@ export default function RicettePage() {
             ))}
           </div>
         )}
+
+        {/* CTA consulenza gratuita */}
+        <div className="mt-16 bg-gradient-to-br from-dark-700 to-dark-900 border border-brand-500/20 rounded-3xl p-10 text-center">
+          <h2 className="font-display text-2xl md:text-3xl font-bold text-white mb-3">
+            Vuoi un'analisi <span className="gradient-text">gratuita</span> della tua attività?
+          </h2>
+          <p className="text-gray-400 max-w-xl mx-auto mb-6">
+            Pizzeria o mulino, la prima consulenza è gratuita e senza impegno: parliamo del tuo progetto
+            e valutiamo insieme le opportunità.
+          </p>
+          <Link href="/#contatti" className="btn-primary inline-flex">
+            Prenota la tua consulenza gratuita
+          </Link>
+        </div>
       </div>
     </div>
   );

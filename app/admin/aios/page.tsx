@@ -12,6 +12,7 @@ type AiosData = {
     viewsThisMonth: number;
     socialDrafts: number;
     forumThreads: number;
+    contactRequestsThisMonth: number;
     generatedAt: string;
   };
   context: {
@@ -119,6 +120,7 @@ export default function AiosPage() {
                 <Metric label="Visite (mese)" value={data.metrics.viewsThisMonth} />
                 <Metric label="Bozze social" value={data.metrics.socialDrafts} />
                 <Metric label="Discussioni community" value={data.metrics.forumThreads} />
+                <Metric label="Richieste consulenza (mese)" value={data.metrics.contactRequestsThisMonth} />
               </div>
               <p className="text-xs text-gray-400 mt-2">
                 Aggiornato: {new Date(data.metrics.generatedAt).toLocaleString("it-IT", { timeZone: "Europe/Rome" })}
