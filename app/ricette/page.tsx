@@ -75,12 +75,12 @@ export default function RicettePage() {
             Nessuna ricetta disponibile al momento. Torna presto!
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-7">
             {recipes.map((r) => (
-              <div key={r.id} className="card flex flex-col gap-0 group overflow-hidden p-0">
+              <div key={r.id} className="group bg-dark-800 border border-dark-600 rounded-2xl overflow-hidden hover:border-brand-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-brand-500/5 flex flex-col">
                 {/* Immagine */}
                 {r.image_url ? (
-                  <div className="w-full h-44 overflow-hidden">
+                  <div className="w-full h-60 overflow-hidden flex-shrink-0">
                     <img
                       src={r.image_url}
                       alt={r.title}
@@ -88,28 +88,40 @@ export default function RicettePage() {
                     />
                   </div>
                 ) : (
-                  <div className="w-full h-44 bg-dark-700 flex items-center justify-center">
-                    <ChefHat className="text-brand-400/40 w-10 h-10" />
+                  <div className="w-full h-60 bg-dark-700 flex items-center justify-center flex-shrink-0">
+                    <ChefHat className="text-brand-400/30 w-14 h-14" />
                   </div>
                 )}
 
-                <div className="flex flex-col gap-3 p-5 flex-1">
+                <div className="flex flex-col gap-3 p-6 flex-1">
+                  {/* Badge livello e categoria */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs bg-brand-500/15 text-brand-300 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold bg-brand-500/15 text-brand-300 border border-brand-500/20 px-2.5 py-1 rounded-full">
                       {r.category}
                     </span>
                     {r.level && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${levelColor[r.level] ?? "bg-gray-500/15 text-gray-300"}`}>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                        r.level === "Base"
+                          ? "bg-green-500/10 text-green-300 border-green-500/20"
+                          : r.level === "Intermedio"
+                          ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/20"
+                          : "bg-red-500/10 text-red-300 border-red-500/20"
+                      }`}>
                         {r.level}
                       </span>
                     )}
                   </div>
-                  <h3 className="text-white font-semibold text-base leading-snug">
+
+                  <h3 className="text-white font-semibold text-lg leading-snug">
                     {r.title}
                   </h3>
+
                   {r.description && (
-                    <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">{r.description}</p>
+                    <p className="text-gray-400 text-sm leading-relaxed line-clamp-3 flex-1">
+                      {r.description}
+                    </p>
                   )}
+
                   {r.collaborators ? (
                     <Link href={`/collaboratori/${r.collaborators.slug}`}
                       className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
@@ -119,21 +131,22 @@ export default function RicettePage() {
                     <span className="text-xs text-gray-600">di Stefano Porro</span>
                   )}
 
+                  {/* CTA download */}
                   {r.file_url ? (
                     <a
                       href={r.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       download
-                      className="mt-auto inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-4 py-2.5 rounded-full text-sm transition-all duration-300 hover:scale-105 self-start"
+                      className="mt-2 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-4 py-3 rounded-xl text-sm transition-all duration-300 hover:shadow-lg hover:shadow-brand-500/25"
                     >
-                      <Download size={14} />
-                      Scarica PDF
+                      <Download size={15} />
+                      Scarica ricetta PDF
                     </a>
                   ) : (
-                    <span className="mt-auto inline-flex items-center gap-2 bg-dark-700 text-gray-500 px-4 py-2.5 rounded-full text-sm self-start">
+                    <div className="mt-2 flex items-center justify-center gap-2 bg-dark-700 text-gray-500 px-4 py-3 rounded-xl text-sm">
                       PDF in arrivo
-                    </span>
+                    </div>
                   )}
                 </div>
               </div>
