@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Download, ChefHat, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import LikeButton from "@/components/LikeButton";
 
 type Recipe = {
   id: string;
@@ -14,6 +15,7 @@ type Recipe = {
   image_url: string;
   active: boolean;
   sort_order: number;
+  likes_count: number;
   collaborators: { id: string; name: string; slug: string } | null;
 };
 
@@ -130,6 +132,8 @@ export default function RicettePage() {
                   ) : (
                     <span className="text-xs text-gray-600">di Stefano Porro</span>
                   )}
+
+                  <LikeButton type="recipe" id={r.id} initialCount={r.likes_count ?? 0} />
 
                   {/* CTA download */}
                   {r.file_url ? (

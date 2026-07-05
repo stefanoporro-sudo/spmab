@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import LikeButton from "@/components/LikeButton";
 
 type Post = {
   id: string;
@@ -17,6 +18,7 @@ type Post = {
   published: boolean;
   published_at: string;
   created_at: string;
+  likes_count: number;
 };
 
 async function getPost(slug: string): Promise<Post | null> {
@@ -247,6 +249,9 @@ export default async function BlogPostPage({
 
           {/* Footer articolo */}
           <div className="mt-14 pt-8 border-t border-dark-600">
+            <div className="mb-6">
+              <LikeButton type="post" id={post.id} initialCount={post.likes_count ?? 0} />
+            </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center flex-shrink-0">
