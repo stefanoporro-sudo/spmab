@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Bookmark } from "lucide-react";
+import Link from "next/link";
 
 const navLinks = [
   { href: "/#servizi", label: "Servizi" },
@@ -60,13 +61,23 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* CTA */}
-        <a
-          href="#contatti"
-          className="hidden md:inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-6 py-2.5 rounded-full text-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-500/30"
-        >
-          Consulenza Gratuita
-        </a>
+        {/* Salvati + CTA */}
+        <div className="hidden md:flex items-center gap-3">
+          <Link
+            href="/salvati"
+            className="text-gray-400 hover:text-brand-300 transition-colors p-2 rounded-lg hover:bg-brand-500/10"
+            aria-label="I miei salvati"
+            title="I miei salvati"
+          >
+            <Bookmark size={18} />
+          </Link>
+          <a
+            href="#contatti"
+            className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-6 py-2.5 rounded-full text-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-500/30"
+          >
+            Consulenza Gratuita
+          </a>
+        </div>
 
         {/* Mobile toggle */}
         <button

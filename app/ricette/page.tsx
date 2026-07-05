@@ -5,6 +5,7 @@ import { Download, ChefHat, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import LikeButton from "@/components/LikeButton";
 import ShareButton from "@/components/ShareButton";
+import SaveButton from "@/components/SaveButton";
 
 type Recipe = {
   id: string;
@@ -136,6 +137,12 @@ export default function RicettePage() {
 
                   <div className="flex items-center gap-2 flex-wrap">
                     <LikeButton type="recipe" id={r.id} initialCount={r.likes_count ?? 0} />
+                    <SaveButton
+                      type="recipe"
+                      id={r.id}
+                      title={r.title}
+                      url="/ricette"
+                    />
                     <ShareButton
                       title={`Ricetta: ${r.title} — Consulenza Pizzaiolo`}
                       url="https://www.consulenzapizzaiolo.it/ricette"

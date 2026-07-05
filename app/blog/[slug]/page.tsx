@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import LikeButton from "@/components/LikeButton";
 import ShareButton from "@/components/ShareButton";
+import SaveButton from "@/components/SaveButton";
 
 type Post = {
   id: string;
@@ -252,6 +253,12 @@ export default async function BlogPostPage({
           <div className="mt-14 pt-8 border-t border-dark-600">
             <div className="mb-6 flex items-center gap-3 flex-wrap">
               <LikeButton type="post" id={post.id} initialCount={post.likes_count ?? 0} />
+              <SaveButton
+                type="post"
+                id={post.id}
+                title={post.title}
+                url={`/blog/${post.slug}`}
+              />
               <ShareButton
                 title={post.title}
                 url={`https://www.consulenzapizzaiolo.it/blog/${post.slug}`}
