@@ -20,7 +20,7 @@ type Post = {
   id: string; title: string; slug: string; excerpt: string; content: string;
   category: string; cover_url: string; published: boolean; published_at: string; created_at: string;
 };
-type PostForm = Omit<Post, "id" | "published_at" | "created_at">;
+type PostForm = Omit<Post, "id" | "created_at">;
 type SocialPost = {
   id: string; source_type: "post" | "recipe"; source_id: string;
   caption: string; image_url: string; scheduled_slot: string;
@@ -69,6 +69,7 @@ const emptyRecipe: RecipeForm = {
 const emptyPost: PostForm = {
   title: "", slug: "", excerpt: "", content: "",
   category: "Pizza", cover_url: "", published: false,
+  published_at: new Date().toISOString().slice(0, 10),
 };
 const POST_CATEGORIES = ["Pizza", "Panificazione", "Consulenza", "Business", "Generale"];
 const emptyTestimonial: TestimonialForm = { name: "", role: "", stars: 5, text: "", active: true, sort_order: 99 };
@@ -557,6 +558,7 @@ setAuthenticated(true);
       title: p.title, slug: p.slug, excerpt: p.excerpt,
       content: p.content, category: p.category,
       cover_url: p.cover_url, published: p.published,
+      published_at: (p.published_at ?? p.created_at ?? new Date().toISOString()).slice(0, 10),
     });
     setPostError("");
     setShowPostForm(true);
@@ -2104,6 +2106,17 @@ setAuthenticated(true);
                     {postForm.published ? "Pubblicato" : "Bozza"}
                   </button>
                 </div>
+              </div>
+
+              {/* Data pubblicazione */}
+              <div>
+                <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Data pubblicazione</label>
+                <input
+                  type="date"
+                  value={postForm.published_at?.slice(0, 10) ?? ""}
+                  onChange={(e) => setPostForm(f => ({ ...f, published_at: e.target.value }))}
+                  className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                />
               </div>
 
               {/* Excerpt */}
