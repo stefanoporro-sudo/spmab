@@ -14,10 +14,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const body = await req.json();
 
-  // Se si pubblica ora, imposta published_at
+  // Se si pubblica ora e non è stata passata una data manuale, imposta published_at automaticamente
   const updateData: Record<string, unknown> = { ...body };
-  if (body.published === true) {
-    // Controlla se era già pubblicato per non sovrascrivere la data originale
+  if (body.published === true && !body.published_at) {
     const { data: existing } = await supabase.from("posts").select("published_at, published").eq("id", id).single();
     if (!existing?.published) {
       updateData.published_at = new Date().toISOString();
