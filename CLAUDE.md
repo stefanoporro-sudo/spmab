@@ -19,6 +19,7 @@
 - `META_PAGE_ID` — ID della Pagina Facebook collegata
 - `META_IG_USER_ID` — ID dell'account Instagram Business collegato alla Pagina
 - `SOCIAL_DRY_RUN` — se `true`, la pubblicazione social simula il successo senza chiamare davvero Meta (solo per test)
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — bot Telegram dedicato per le notifiche dei Reel
 
 ## Autenticazione admin
 Le API admin accettano l'header `x-admin-password: Spmab2024!`.
@@ -35,6 +36,7 @@ Tre sistemi in parallelo per massima affidabilità:
 | Articolo blog | `/api/cron/blog` | lun-ven 8:30 CEST |
 | Report statistiche | `/api/cron/daily-report` | ogni giorno 9:00 CEST |
 | Bozza post social | `/api/cron/social?slot=11:00\|16:00\|19:00` | ogni giorno 11:00, 16:00, 19:00 CEST — trigger da **cron-job.org** (non vercel.json, gestisce nativamente il cambio ora legale) |
+| Bozza Reel | `/api/cron/reel` | lun-ven 19:00 CEST — trigger da **cron-job.org**, notifica via Telegram (non email) |
 
 Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e genera l'articolo in background. L'email con la bozza arriva a **porroste80@gmail.com**.
 
@@ -45,7 +47,7 @@ Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e
 - `page_views` — visite al sito
 - `forum_threads` — discussioni community
 - `forum_replies` — risposte forum
-- `social_posts` — bozze di post Instagram/Facebook (caption generata da Claude, immagine caricata a mano, stati `draft/approved/publishing/published/failed/rejected`)
+- `social_posts` — bozze di post Instagram/Facebook (caption generata da Claude, immagine caricata a mano, stati `draft/approved/publishing/published/failed/rejected`). Colonna `content_type` (`post`/`reel`) distingue i post foto (pubblicati via Meta API) dai Reel (caption pronta da copiare, pubblicazione sempre manuale in Instagram — l'API Instagram non permette di scegliere musica dal catalogo)
 
 ## Storage Supabase (bucket)
 - `blog` — copertine articoli (PNG 1600×840)
@@ -56,6 +58,8 @@ Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e
 Il cron `/api/cron/social` genera 3 volte al giorno una bozza di caption (alternando articoli blog e ricette pubblicate) e la salva in `social_posts` con `status: draft`. **Non genera immagini automaticamente**: Stefano carica a mano una foto reale (o generata su richiesta in chat con Claude) dal pannello `/admin` → tab **Social**, prima di poter approvare. Solo dopo l'approvazione esplicita, il bottone "Pubblica ora" chiama `/api/social/[id]/publish`, che pubblica su Instagram e Facebook via Meta Graph API — nessuna pubblicazione è mai automatica.
 
 Il Page Access Token Meta scade ogni 60 giorni: il cron `daily-report` controlla la scadenza (`debug_token`) e invia un'email di avviso se mancano meno di 7 giorni.
+
+**Reel**: il cron `/api/cron/reel` genera lun-ven alle 19:00 solo la caption (stile "hook" per video, più corta di un post normale) e notifica via **Telegram** (non email). Non c'è pubblicazione via Meta API: Stefano copia la caption pronta dal pannello (bottone "Copia caption"), monta il Reel con musica direttamente in Instagram, e poi clicca "Segna come pubblicato" per tracciarlo — l'API Instagram non permette di scegliere un brano dal catalogo musicale in automatico.
 
 ## Regole contenuto importanti
 - Usare sempre **"fermentazione"** — mai "maturazione"

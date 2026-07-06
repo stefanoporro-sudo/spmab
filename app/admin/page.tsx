@@ -23,6 +23,7 @@ type Post = {
 type PostForm = Omit<Post, "id" | "created_at">;
 type SocialPost = {
   id: string; source_type: "post" | "recipe"; source_id: string;
+  content_type: "post" | "reel";
   caption: string; image_url: string; scheduled_slot: string;
   status: "draft" | "approved" | "publishing" | "published" | "failed" | "rejected";
   platforms: string[];
@@ -146,6 +147,7 @@ export default function AdminPage() {
   const [socialError, setSocialError] = useState("");
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState("");
+  const [copiedSocialId, setCopiedSocialId] = useState<string | null>(null);
   // Apertura diretta di un post social via link email (/admin?tab=social&edit=ID)
   const [pendingSocialEditId, setPendingSocialEditId] = useState<string | null>(null);
 
@@ -331,6 +333,12 @@ setAuthenticated(true);
     await fetch(`/api/social/${id}`, { method: "DELETE", headers: { "x-admin-password": password } });
     setDeletingSocialId(null);
     fetchSocialPosts();
+  };
+
+  const copySocialCaption = async (id: string, caption: string) => {
+    await navigator.clipboard.writeText(caption);
+    setCopiedSocialId(id);
+    setTimeout(() => setCopiedSocialId((cur) => (cur === id ? null : cur)), 2000);
   };
 
   // ── Delete PDF ───────────────────────────────────────────────────
@@ -1342,7 +1350,10 @@ setAuthenticated(true);
                             : p.status === "rejected" ? "Rifiutato"
                             : "Bozza"}
                         </span>
-                        <span className="text-gray-500 text-xs">{p.scheduled_slot} · {p.source_type === "post" ? "📝 Articolo" : "🍕 Ricetta"}</span>
+                        <span className="text-gray-500 text-xs">
+                          {p.content_type === "reel" && "🎬 Reel · "}
+                          {p.scheduled_slot} · {p.source_type === "post" ? "📝 Articolo" : "🍕 Ricetta"}
+                        </span>
                       </div>
 
                       {p.image_url ? (
@@ -1419,28 +1430,52 @@ setAuthenticated(true);
                           </button>
                         )}
 
-                        {(p.status === "draft" || p.status === "rejected") && (
-                          <button
-                            onClick={() => updateSocialPost(p.id, { status: "approved" })}
-                            disabled={!p.image_url || savingSocialId === p.id}
-                            className="bg-green-600 hover:bg-green-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
-                            title={!p.image_url ? "Carica prima un'immagine" : undefined}
-                          >
-                            <Check size={12} className="inline mr-1" /> Approva
-                          </button>
-                        )}
+                        {p.content_type === "reel" ? (
+                          <>
+                            {p.status !== "published" && (
+                              <button
+                                onClick={() => copySocialCaption(p.id, p.caption)}
+                                className="border border-dark-500 text-gray-300 hover:text-white hover:border-brand-500 rounded-lg px-3 py-1.5 text-xs transition-colors"
+                              >
+                                {copiedSocialId === p.id ? "Copiato!" : "Copia caption"}
+                              </button>
+                            )}
+                            {(p.status === "draft" || p.status === "rejected") && (
+                              <button
+                                onClick={() => updateSocialPost(p.id, { status: "published" })}
+                                disabled={savingSocialId === p.id}
+                                className="bg-brand-500 hover:bg-brand-400 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                              >
+                                <Check size={12} className="inline mr-1" /> Segna come pubblicato
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {(p.status === "draft" || p.status === "rejected") && (
+                              <button
+                                onClick={() => updateSocialPost(p.id, { status: "approved" })}
+                                disabled={!p.image_url || savingSocialId === p.id}
+                                className="bg-green-600 hover:bg-green-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
+                                title={!p.image_url ? "Carica prima un'immagine" : undefined}
+                              >
+                                <Check size={12} className="inline mr-1" /> Approva
+                              </button>
+                            )}
 
-                        {(p.status === "approved" || p.status === "failed") && (
-                          <button
-                            onClick={() => publishSocialPost(p.id)}
-                            disabled={publishingSocialId === p.id}
-                            className="bg-brand-500 hover:bg-brand-400 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-                          >
-                            {publishingSocialId === p.id
-                              ? <Loader2 size={12} className="inline animate-spin mr-1" />
-                              : <Send size={12} className="inline mr-1" />}
-                            {p.status === "failed" ? "Riprova pubblicazione" : "Pubblica ora"}
-                          </button>
+                            {(p.status === "approved" || p.status === "failed") && (
+                              <button
+                                onClick={() => publishSocialPost(p.id)}
+                                disabled={publishingSocialId === p.id}
+                                className="bg-brand-500 hover:bg-brand-400 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                              >
+                                {publishingSocialId === p.id
+                                  ? <Loader2 size={12} className="inline animate-spin mr-1" />
+                                  : <Send size={12} className="inline mr-1" />}
+                                {p.status === "failed" ? "Riprova pubblicazione" : "Pubblica ora"}
+                              </button>
+                            )}
+                          </>
                         )}
 
                         {p.status !== "published" && (
