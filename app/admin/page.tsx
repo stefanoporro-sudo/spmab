@@ -22,8 +22,9 @@ type Post = {
 };
 type PostForm = Omit<Post, "id" | "created_at">;
 type SocialPost = {
-  id: string; source_type: "post" | "recipe"; source_id: string;
+  id: string; source_type: "post" | "recipe" | "standalone"; source_id: string | null;
   content_type: "post" | "reel";
+  angle: string | null;
   caption: string; image_url: string; scheduled_slot: string;
   status: "draft" | "approved" | "publishing" | "published" | "failed" | "rejected";
   platforms: string[];
@@ -1352,7 +1353,11 @@ setAuthenticated(true);
                         </span>
                         <span className="text-gray-500 text-xs">
                           {p.content_type === "reel" && "🎬 Reel · "}
-                          {p.scheduled_slot} · {p.source_type === "post" ? "📝 Articolo" : "🍕 Ricetta"}
+                          {p.scheduled_slot} ·{" "}
+                          {p.source_type === "post" ? "📝 Articolo"
+                            : p.source_type === "recipe" ? "🍕 Ricetta"
+                            : "💡 Contenuto originale"}
+                          {p.angle && ` · ${p.angle}`}
                         </span>
                       </div>
 

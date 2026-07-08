@@ -48,7 +48,7 @@ Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e
 - `page_views` — visite al sito
 - `forum_threads` — discussioni community
 - `forum_replies` — risposte forum
-- `social_posts` — bozze di post Instagram/Facebook (caption generata da Claude, immagine caricata a mano, stati `draft/approved/publishing/published/failed/rejected`). Colonna `content_type` (`post`/`reel`) distingue i post foto (pubblicati via Meta API) dai Reel (caption pronta da copiare, pubblicazione sempre manuale in Instagram — l'API Instagram non permette di scegliere musica dal catalogo)
+- `social_posts` — bozze di post Instagram/Facebook (caption generata da Claude, immagine caricata a mano, stati `draft/approved/publishing/published/failed/rejected`). Colonna `content_type` (`post`/`reel`) distingue i post foto (pubblicati via Meta API) dai Reel (caption pronta da copiare, pubblicazione sempre manuale in Instagram — l'API Instagram non permette di scegliere musica dal catalogo). Colonna `source_type` (`post`/`recipe`/`standalone`) indica se la caption parte da un articolo blog, una ricetta, o è un contenuto originale (`source_id` è null in quel caso). Colonna `angle` traccia quale delle 6 categorie tematiche (tecnica, ingredienti, attrezzatura, business, storia, gourmet) è stata usata, per evitare di ripetere lo stesso angolo sulla stessa fonte
 
 ## Storage Supabase (bucket)
 - `blog` — copertine articoli (PNG 1600×840)
@@ -61,6 +61,8 @@ Il cron `/api/cron/social` genera 3 volte al giorno una bozza di caption (altern
 Il Page Access Token Meta scade ogni 60 giorni: il cron `daily-report` controlla la scadenza (`debug_token`) e invia un'email di avviso se mancano meno di 7 giorni.
 
 **Reel**: il cron `/api/cron/reel` genera lun-ven alle 19:00 solo la caption (stile "hook" per video, più corta di un post normale) e notifica via **Telegram** (non email). Non c'è pubblicazione via Meta API: Stefano copia la caption pronta dal pannello (bottone "Copia caption"), monta il Reel con musica direttamente in Instagram, e poi clicca "Segna come pubblicato" per tracciarlo — l'API Instagram non permette di scegliere un brano dal catalogo musicale in automatico.
+
+**Anti-ripetizione (fonte × angolo)**: post e Reel condividono lo stesso pool di contenuti (`posts` + `recipes`) a un ritmo di produzione molto più veloce di quanto blog/ricette crescano, quindi il riciclo delle fonti è inevitabile. Per non risultare ripetitivi: (1) un terzo delle generazioni (rotazione `count % 3`) è **contenuto standalone** — non parte da un articolo/ricetta esistente, ma scrive direttamente su una delle 6 categorie tematiche (aneddoto storico, mito da sfatare, tip pratico); (2) per le generazioni legate a un articolo/ricetta, la scelta della fonte privilegia quella che ha esaurito meno dei 6 angoli possibili, e il prompt a Claude riceve esplicitamente quali angoli sono già stati usati su quella fonte specifica, per sceglierne uno diverso ogni volta.
 
 ## Regole contenuto importanti
 - Usare sempre **"fermentazione"** — mai "maturazione"
