@@ -61,8 +61,9 @@ async function generateArticle() {
   }
 
   // 1. Articoli già esistenti (per non ripetere)
-  const { data: posts } = await supabase.from("posts").select("title, slug");
+  const { data: posts } = await supabase.from("posts").select("title, slug, created_at").order("created_at", { ascending: false });
   const existingTitles = (posts ?? []).map((p) => `- ${p.title}`).join("\n") || "Nessuno ancora";
+  const recentTitles = (posts ?? []).slice(0, 6).map((p) => `- ${p.title}`).join("\n") || "Nessuno ancora";
 
   // 2. Genera articolo via Claude API
   const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -83,7 +84,19 @@ async function generateArticle() {
 Articoli già pubblicati (NON ripetere questi argomenti):
 ${existingTitles}
 
-Scegli UN argomento NUOVO tra questi: idratazione dell'impasto, scelta del forno, biga e poolish, gestione della cella frigorifera, temperatura dell'acqua nell'impasto, il cornicione perfetto, pizza in teglia vs tonda, il pomodoro giusto per la pizza, la mozzarella e la gestione dell'umidità, food cost, il menù della pizzeria, marketing per pizzeria, errori di cottura, gli attrezzi del pizzaiolo, farine alternative (tipo 1, integrale, senza glutine), lievito madre per la pizza, come gestire le recensioni online, stagionalità degli ingredienti.
+Ultimi 6 articoli in ordine cronologico (i più recenti, usali per capire quale categoria è già stata sovra-usata di recente):
+${recentTitles}
+
+Gli argomenti sono organizzati in 6 categorie. Individua quale categoria domina gli ultimi 6 articoli sopra, e scegli il prossimo argomento da una categoria DIVERSA (se due categorie sono ancora del tutto inedite, dai priorità a quelle). Non scegliere mai due articoli di fila dalla categoria "Tecnica e impasto": è la più facile da esaurire e tende a monopolizzare il blog se non bilanciata attivamente.
+
+1. **Tecnica e impasto**: idratazione dell'impasto, biga e poolish, temperatura dell'acqua, il cornicione perfetto, autolisi, lievito madre, fermentazione (tempi e metodi), errori di cottura
+2. **Ingredienti e materie prime**: il pomodoro giusto per la pizza, la mozzarella e la gestione dell'umidità, farine alternative (tipo 1, integrale, senza glutine), stagionalità degli ingredienti
+3. **Attrezzatura e ambiente di lavoro**: scelta del forno, gestione della cella frigorifera, gli attrezzi del pizzaiolo, la pala da pizza
+4. **Business e gestione**: food cost, il menù della pizzeria, marketing per pizzeria, come gestire le recensioni online, gestione del personale in pizzeria
+5. **Cultura e storia**: storia del grano e delle farine nel tempo, storia della pizza dalle origini a oggi, le differenze tra gli stili regionali italiani (napoletana, romana, in teglia, al padellino) e la loro origine storica
+6. **Ricette gourmet**: abbinamenti di farcitura non convenzionali, contaminazioni tra pizza e alta cucina, pizze gourmet stagionali con ingredienti di nicchia
+
+Scegli UN argomento NUOVO (non ancora coperto) da una delle categorie sopra, rispettando la regola di rotazione.
 
 Scrivi un articolo in italiano, tono professionale ma accessibile, ~700-1000 parole.
 Formato:

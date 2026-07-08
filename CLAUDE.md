@@ -26,10 +26,11 @@ Le API admin accettano l'header `x-admin-password: Spmab2024!`.
 Il pannello admin è su `/admin`.
 
 ## Cron job (automazioni giornaliere)
-Tre sistemi in parallelo per massima affidabilità:
-1. **Vercel cron** (`vercel.json`)
-2. **GitHub Actions** (`.github/workflows/daily-blog.yml`)
-3. **cron-job.org** (configurato manualmente, header `x-admin-password`)
+Due sistemi effettivi (la cartella `.github/workflows` esiste ma è vuota — GitHub Actions non è mai stato attivato nonostante fosse documentato qui):
+1. **Vercel cron** (`vercel.json`) — `/api/cron/blog` gira lun-ven 8:30 CEST
+2. **cron-job.org** (configurato manualmente, header `x-admin-password`) — usato per i job che Vercel non può gestire (più trigger al giorno, orari specifici)
+
+⚠️ **Se su cron-job.org è configurato ANCHE un job per `/api/cron/blog`**, il blog genera due articoli al giorno invece di uno (non è un doppio sistema di sicurezza, sono due trigger reali che eseguono entrambi). Va lasciato attivo un solo trigger per il blog.
 
 | Job | Endpoint | Orario |
 |-----|----------|--------|
