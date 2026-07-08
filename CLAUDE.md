@@ -66,6 +66,8 @@ Il Page Access Token Meta scade ogni 60 giorni: il cron `daily-report` controlla
 
 Le 10 categorie (`angle`): tecnica (impasto), ingredienti, attrezzatura, business (pizzeria avviata), storia/cultura, ricette gourmet, miti e disinformazione, FAQ clienti, aprire una pizzeria, vita da pizzaiolo.
 
+(3) Ogni generazione riceve anche i titoli di **tutti** gli articoli blog pubblicati e l'apertura delle ultime 15 caption social/Reel già create — comprese quelle **rifiutate** da Stefano — con l'istruzione di non ritrattare lo stesso argomento specifico (es. "autolisi") anche se l'angolo è diverso. Per questo motivo il bottone "Rifiuta" nel pannello admin non elimina più la riga (`status: rejected`, non una DELETE): la storia va preservata perché il sistema la usa per evitare di riproporre argomenti già scartati.
+
 ## Regole contenuto importanti
 - Usare sempre **"fermentazione"** — mai "maturazione"
 - **Non affermare** che la fermentazione migliora la digeribilità della pizza: è falso. La digeribilità dipende principalmente dalla farcitura e dalla cottura.

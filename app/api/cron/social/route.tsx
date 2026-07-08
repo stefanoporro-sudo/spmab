@@ -156,13 +156,43 @@ function extractJson(rawText: string): { caption: string; hashtags: string[]; an
   return JSON.parse(rawText.slice(start, end + 1));
 }
 
-function buildContentPrompt(source: SourceContent): string {
+async function getRecentTopicHistory(): Promise<string> {
+  const { data: blogPosts } = await supabase
+    .from("posts")
+    .select("title")
+    .order("created_at", { ascending: false })
+    .limit(60);
+  const blogTitles = (blogPosts ?? []).map((p) => `- ${p.title}`).join("\n") || "Nessuno";
+
+  const { data: recentSocial } = await supabase
+    .from("social_posts")
+    .select("caption, created_at")
+    .order("created_at", { ascending: false })
+    .limit(15);
+  const socialSnippets = (recentSocial ?? [])
+    .map((p) => `- ${p.caption.split("\n")[0].slice(0, 120)}`)
+    .join("\n") || "Nessuno";
+
+  return `Titoli di TUTTI gli articoli blog già pubblicati (compresi quelli non usati finora per i social):
+${blogTitles}
+
+Apertura delle ultime caption social/Reel già create (comprese quelle rifiutate da Stefano — se un argomento specifico è già qui, evitalo, vuol dire che è già stato trattato o non è piaciuto):
+${socialSnippets}`;
+}
+
+function buildContentPrompt(source: SourceContent, history: string): string {
+  const historyBlock = `${history}
+
+IMPORTANTE: anche se l'angolo/categoria è diverso, NON ritrattare uno specifico argomento/tecnica (es. "autolisi", "biga e poolish") già coperto in dettaglio in uno dei titoli o caption sopra. Se il tema è già stato trattato, scegli un sotto-argomento distinto o un taglio narrativo chiaramente diverso.`;
+
   if (source.sourceType === "standalone") {
     return `Scrivi una caption per un post Instagram/Facebook come contenuto originale (non parte da un articolo specifico del sito), sul seguente angolo:
 
 ${ANGLE_CATEGORIES}
 
 Angolo da trattare: "${source.forcedAngle}" (usa esattamente questo valore nel campo "angle" della risposta).
+
+${historyBlock}
 
 Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, se non sei sicuro di un dettaglio storico resta sul generico piuttosto che inventare date o nomi.`;
   }
@@ -179,7 +209,9 @@ Gli angoli possibili sono questi 6:
 ${ANGLE_CATEGORIES}
 
 ${avoidBlock}
-Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero) e dichiaralo nel campo "angle" della risposta con il suo codice (tecnica/ingredienti/attrezzatura/business/storia/gourmet/miti/faq/avviare/vita). Reinterpreta il contenuto del sito sotto quella lente, senza inventare fatti che non c'entrano con la fonte.`;
+Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero) e dichiaralo nel campo "angle" della risposta con il suo codice (tecnica/ingredienti/attrezzatura/business/storia/gourmet/miti/faq/avviare/vita). Reinterpreta il contenuto del sito sotto quella lente, senza inventare fatti che non c'entrano con la fonte.
+
+${historyBlock}`;
 }
 
 async function generateDraft(slot: string) {
@@ -195,7 +227,8 @@ async function generateDraft(slot: string) {
     return;
   }
 
-  const contentPrompt = buildContentPrompt(source);
+  const history = await getRecentTopicHistory();
+  const contentPrompt = buildContentPrompt(source, history);
 
   const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

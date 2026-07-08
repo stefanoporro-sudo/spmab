@@ -328,12 +328,10 @@ setAuthenticated(true);
     fetchSocialPosts();
   };
 
-  const deleteSocialPost = async (id: string) => {
-    if (!confirm("Rifiutare ed eliminare questa bozza?")) return;
+  const rejectSocialPost = async (id: string) => {
     setDeletingSocialId(id);
-    await fetch(`/api/social/${id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+    await updateSocialPost(id, { status: "rejected" });
     setDeletingSocialId(null);
-    fetchSocialPosts();
   };
 
   const copySocialCaption = async (id: string, caption: string) => {
@@ -1483,9 +1481,9 @@ setAuthenticated(true);
                           </>
                         )}
 
-                        {p.status !== "published" && (
+                        {p.status !== "published" && p.status !== "rejected" && (
                           <button
-                            onClick={() => deleteSocialPost(p.id)}
+                            onClick={() => rejectSocialPost(p.id)}
                             disabled={deletingSocialId === p.id}
                             className="border border-dark-500 text-gray-500 hover:text-red-400 hover:border-red-500/40 rounded-lg px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
                           >
