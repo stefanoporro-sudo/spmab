@@ -93,6 +93,22 @@ function extractJson(rawText: string): { caption: string; hashtags: string[] } {
   return JSON.parse(rawText.slice(start, end + 1));
 }
 
+const ANGLE_CATEGORIES = `1. Tecnica e impasto (idratazione, biga e poolish, temperatura dell'acqua, cornicione, autolisi, lievito madre, fermentazione, errori di cottura)
+2. Ingredienti e materie prime (il pomodoro giusto, la mozzarella e l'umidità, farine alternative, stagionalità)
+3. Attrezzatura e ambiente di lavoro (scelta del forno, cella frigorifera, attrezzi del pizzaiolo, la pala)
+4. Business e gestione (food cost, il menù, marketing per pizzeria, recensioni online, gestione del personale)
+5. Cultura e storia (storia del grano e delle farine, storia della pizza, differenze tra stili regionali italiani)
+6. Ricette gourmet (abbinamenti non convenzionali, contaminazioni con l'alta cucina, pizze gourmet stagionali)`;
+
+async function getRecentCaptions(limit: number): Promise<string[]> {
+  const { data } = await supabase
+    .from("social_posts")
+    .select("caption, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []).map((p) => p.caption);
+}
+
 async function generateDraft(slot: string) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -105,6 +121,11 @@ async function generateDraft(slot: string) {
     console.error("[social-cron] Nessun contenuto disponibile (post/ricette)");
     return;
   }
+
+  const recentCaptions = await getRecentCaptions(5);
+  const recentCaptionsBlock = recentCaptions.length
+    ? recentCaptions.map((c, i) => `--- Caption ${i + 1} ---\n${c}`).join("\n\n")
+    : "Nessuna caption precedente.";
 
   const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -124,6 +145,14 @@ async function generateDraft(slot: string) {
 Scrivi una caption per un post Instagram/Facebook a partire da questo contenuto del sito:
 Titolo: ${source.title}
 Sintesi: ${source.summary}
+
+Le ultime 5 caption già pubblicate (per NON ripetere lo stesso angolo/categoria):
+${recentCaptionsBlock}
+
+Gli angoli possibili sono questi 6:
+${ANGLE_CATEGORIES}
+
+Individua quale categoria dominano le caption recenti sopra, e scrivi questa caption con un angolo di una categoria DIVERSA — reinterpreta il contenuto del sito (titolo/sintesi) sotto quella lente, senza inventare fatti che non c'entrano con la fonte. Se il contenuto del sito si presta chiaramente solo a una categoria, va bene restare lì, ma cerca comunque un taglio narrativo diverso dalle caption recenti (es. domanda diretta, aneddoto, confronto, mito da sfatare).
 
 Tono onesto e diretto, niente fuffa da corsi costosi, coerente con un brand che smonta le mode. 150-300 parole, in italiano, con una CTA finale verso consulenzapizzaiolo.it o l'invito a seguire Stefano. 5-8 hashtag pertinenti al mondo pizza/ristorazione.
 

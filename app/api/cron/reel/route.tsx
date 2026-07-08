@@ -91,6 +91,22 @@ function extractJson(rawText: string): { caption: string; hashtags: string[] } {
   return JSON.parse(rawText.slice(start, end + 1));
 }
 
+const ANGLE_CATEGORIES = `1. Tecnica e impasto (idratazione, biga e poolish, temperatura dell'acqua, cornicione, autolisi, lievito madre, fermentazione, errori di cottura)
+2. Ingredienti e materie prime (il pomodoro giusto, la mozzarella e l'umidità, farine alternative, stagionalità)
+3. Attrezzatura e ambiente di lavoro (scelta del forno, cella frigorifera, attrezzi del pizzaiolo, la pala)
+4. Business e gestione (food cost, il menù, marketing per pizzeria, recensioni online, gestione del personale)
+5. Cultura e storia (storia del grano e delle farine, storia della pizza, differenze tra stili regionali italiani)
+6. Ricette gourmet (abbinamenti non convenzionali, contaminazioni con l'alta cucina, pizze gourmet stagionali)`;
+
+async function getRecentCaptions(limit: number): Promise<string[]> {
+  const { data } = await supabase
+    .from("social_posts")
+    .select("caption, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []).map((p) => p.caption);
+}
+
 async function sendTelegramMessage(text: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -118,6 +134,11 @@ async function generateDraft() {
     return;
   }
 
+  const recentCaptions = await getRecentCaptions(5);
+  const recentCaptionsBlock = recentCaptions.length
+    ? recentCaptions.map((c, i) => `--- Caption ${i + 1} ---\n${c}`).join("\n\n")
+    : "Nessuna caption precedente.";
+
   const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -136,6 +157,14 @@ async function generateDraft() {
 Scrivi una caption per un Reel Instagram/Facebook a partire da questo contenuto del sito:
 Titolo: ${source.title}
 Sintesi: ${source.summary}
+
+Le ultime 5 caption già pubblicate su post/reel (per NON ripetere lo stesso angolo/categoria):
+${recentCaptionsBlock}
+
+Gli angoli possibili sono questi 6:
+${ANGLE_CATEGORIES}
+
+Individua quale categoria dominano le caption recenti sopra, e scrivi questa caption con un angolo di una categoria DIVERSA — reinterpreta il contenuto del sito (titolo/sintesi) sotto quella lente, senza inventare fatti che non c'entrano con la fonte. Se il contenuto del sito si presta chiaramente solo a una categoria, va bene restare lì, ma cerca comunque un taglio narrativo diverso dalle caption recenti.
 
 A differenza di un post normale, un Reel si guarda in video: le prime parole della caption devono funzionare da "gancio" che trattiene chi sta guardando (una domanda diretta, un'affermazione che rompe un luogo comune, o un "non fare X finché non guardi questo"). Testo breve, 80-150 parole, in italiano, tono onesto e diretto senza fuffa da corsi costosi. CTA finale verso consulenzapizzaiolo.it o l'invito a seguire Stefano. 5-8 hashtag pertinenti al mondo pizza/ristorazione.
 
