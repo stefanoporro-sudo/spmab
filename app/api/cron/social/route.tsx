@@ -14,15 +14,19 @@ function isAuthorized(req: NextRequest): boolean {
   );
 }
 
-const ANGLES = ["tecnica", "ingredienti", "attrezzatura", "business", "storia", "gourmet"] as const;
+const ANGLES = ["tecnica", "ingredienti", "attrezzatura", "business", "storia", "gourmet", "miti", "faq", "avviare", "vita"] as const;
 type Angle = (typeof ANGLES)[number];
 
 const ANGLE_CATEGORIES = `1. tecnica — Tecnica e impasto (idratazione, biga e poolish, temperatura dell'acqua, cornicione, autolisi, lievito madre, fermentazione, errori di cottura)
 2. ingredienti — Ingredienti e materie prime (il pomodoro giusto, la mozzarella e l'umidità, farine alternative, stagionalità)
 3. attrezzatura — Attrezzatura e ambiente di lavoro (scelta del forno, cella frigorifera, attrezzi del pizzaiolo, la pala)
-4. business — Business e gestione (food cost, il menù, marketing per pizzeria, recensioni online, gestione del personale)
+4. business — Business e gestione di una pizzeria già avviata (food cost, il menù, marketing, recensioni online, gestione del personale)
 5. storia — Cultura e storia (storia del grano e delle farine, storia della pizza, differenze tra stili regionali italiani)
-6. gourmet — Ricette gourmet (abbinamenti non convenzionali, contaminazioni con l'alta cucina, pizze gourmet stagionali)`;
+6. gourmet — Ricette gourmet (abbinamenti non convenzionali, contaminazioni con l'alta cucina, pizze gourmet stagionali)
+7. miti — Miti e disinformazione sulla pizza (falsi miti generali, es. "il forno a legna è sempre meglio dell'elettrico", "la pizza gourmet è solo marketing")
+8. faq — Domande frequenti dei clienti (perché costa di più, tempi di attesa, opzioni senza glutine, cosa chiedono spesso al banco)
+9. avviare — Aprire e avviare una pizzeria (errori tipici dei primi mesi, business plan, scelte iniziali)
+10. vita — Vita da pizzaiolo (dietro le quinte, giornata tipo, aneddoti personali)`;
 
 type SourceContent = {
   sourceType: "post" | "recipe" | "standalone";
@@ -91,14 +95,17 @@ async function pickSource(): Promise<SourceContent | null> {
   const { count } = await supabase
     .from("social_posts")
     .select("*", { count: "exact", head: true });
-  const branch = (count ?? 0) % 3;
+  const n = count ?? 0;
 
-  if (branch === 2) {
+  // 1 generazione su 3 pesca da blog/ricette (alternati), 2 su 3 sono contenuto standalone
+  if (n % 3 !== 0) {
     const angle = await pickLeastUsedAngle();
     return { sourceType: "standalone", sourceId: null, title: "", summary: "", usedAngles: [], forcedAngle: angle };
   }
 
-  if (branch === 0) {
+  const useRecipe = Math.floor(n / 3) % 2 === 1;
+
+  if (!useRecipe) {
     const { data: posts } = await supabase
       .from("posts")
       .select("id, title, excerpt")
@@ -172,7 +179,7 @@ Gli angoli possibili sono questi 6:
 ${ANGLE_CATEGORIES}
 
 ${avoidBlock}
-Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero) e dichiaralo nel campo "angle" della risposta con il suo codice (tecnica/ingredienti/attrezzatura/business/storia/gourmet). Reinterpreta il contenuto del sito sotto quella lente, senza inventare fatti che non c'entrano con la fonte.`;
+Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero) e dichiaralo nel campo "angle" della risposta con il suo codice (tecnica/ingredienti/attrezzatura/business/storia/gourmet/miti/faq/avviare/vita). Reinterpreta il contenuto del sito sotto quella lente, senza inventare fatti che non c'entrano con la fonte.`;
 }
 
 async function generateDraft(slot: string) {
@@ -217,7 +224,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
   "caption": "testo della caption con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
-  "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet"
+  "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita"
 }`,
         },
       ],
