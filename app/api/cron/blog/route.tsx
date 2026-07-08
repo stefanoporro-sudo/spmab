@@ -7,7 +7,6 @@ function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   const adminPassword = req.headers.get("x-admin-password");
-  // Vercel cron usa Bearer CRON_SECRET; test manuale usa x-admin-password
   return (
     (!cronSecret || authHeader === `Bearer ${cronSecret}`) ||
     (!!process.env.ADMIN_PASSWORD && adminPassword === process.env.ADMIN_PASSWORD)
@@ -89,12 +88,12 @@ ${recentTitles}
 
 Gli argomenti sono organizzati in 6 categorie. Individua quale categoria domina gli ultimi 6 articoli sopra, e scegli il prossimo argomento da una categoria DIVERSA (se due categorie sono ancora del tutto inedite, dai priorità a quelle). Non scegliere mai due articoli di fila dalla categoria "Tecnica e impasto": è la più facile da esaurire e tende a monopolizzare il blog se non bilanciata attivamente.
 
-1. **Tecnica e impasto**: idratazione dell'impasto, biga e poolish, temperatura dell'acqua, il cornicione perfetto, autolisi, lievito madre, fermentazione (tempi e metodi), errori di cottura
-2. **Ingredienti e materie prime**: il pomodoro giusto per la pizza, la mozzarella e la gestione dell'umidità, farine alternative (tipo 1, integrale, senza glutine), stagionalità degli ingredienti
-3. **Attrezzatura e ambiente di lavoro**: scelta del forno, gestione della cella frigorifera, gli attrezzi del pizzaiolo, la pala da pizza
-4. **Business e gestione**: food cost, il menù della pizzeria, marketing per pizzeria, come gestire le recensioni online, gestione del personale in pizzeria
-5. **Cultura e storia**: storia del grano e delle farine nel tempo, storia della pizza dalle origini a oggi, le differenze tra gli stili regionali italiani (napoletana, romana, in teglia, al padellino) e la loro origine storica
-6. **Ricette gourmet**: abbinamenti di farcitura non convenzionali, contaminazioni tra pizza e alta cucina, pizze gourmet stagionali con ingredienti di nicchia
+1. **Tecnica e impasto** (categoria app: Pizza): idratazione dell'impasto, biga e poolish, temperatura dell'acqua, il cornicione perfetto, autolisi, lievito madre, fermentazione (tempi e metodi), errori di cottura
+2. **Ingredienti e materie prime** (categoria app: Panificazione): il pomodoro giusto per la pizza, la mozzarella e la gestione dell'umidità, farine alternative (tipo 1, integrale, senza glutine), stagionalità degli ingredienti
+3. **Attrezzatura e ambiente di lavoro** (categoria app: Generale): scelta del forno, gestione della cella frigorifera, gli attrezzi del pizzaiolo, la pala da pizza
+4. **Business e gestione** (categoria app: Business): food cost, il menù della pizzeria, marketing per pizzeria, come gestire le recensioni online, gestione del personale in pizzeria
+5. **Cultura e storia** (categoria app: Consulenza): storia del grano e delle farine nel tempo, storia della pizza dalle origini a oggi, le differenze tra gli stili regionali italiani (napoletana, romana, in teglia, al padellino) e la loro origine storica
+6. **Ricette gourmet** (categoria app: Pizza): abbinamenti di farcitura non convenzionali, contaminazioni tra pizza e alta cucina, pizze gourmet stagionali con ingredienti di nicchia
 
 Scegli UN argomento NUOVO (non ancora coperto) da una delle categorie sopra, rispettando la regola di rotazione.
 
@@ -117,6 +116,8 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   "slug": "titolo-kebab-case-senza-accenti",
   "subtitle": "Breve sottotitolo 5-8 parole",
   "excerpt": "1-2 frasi di anteprima per il blog",
+  "category": "Una di: Pizza|Panificazione|Business|Generale|Consulenza",
+  "unsplash_query": "2-3 English keywords for Unsplash photo (e.g. 'pizza wood fire artisan' or 'sourdough bread bakery flour')",
   "content": "Contenuto completo dell'articolo..."
 }`,
         },
@@ -138,9 +139,10 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     subtitle: string;
     excerpt: string;
     content: string;
+    category: string;
+    unsplash_query: string;
   };
   try {
-    // Estrae il primo oggetto JSON valido (ignora caratteri extra prima/dopo)
     const start = rawText.indexOf("{");
     if (start === -1) throw new Error("no {");
     let depth = 0;
@@ -173,6 +175,12 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   article.excerpt = sanitize(article.excerpt);
   article.content = sanitize(article.content);
 
+  // Valida categoria
+  const validCategories = ["Pizza", "Panificazione", "Business", "Generale", "Consulenza"];
+  if (!validCategories.includes(article.category)) {
+    article.category = "Pizza";
+  }
+
   // 3. Crea bozza su Supabase
   let slug = article.slug;
   let postData: Record<string, unknown> | null = null;
@@ -184,7 +192,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
         slug: attempt === 0 ? slug : `${slug}-${attempt}`,
         excerpt: article.excerpt,
         content: article.content,
-        category: "Pizza",
+        category: article.category,
         published: false,
         cover_url: "",
       })
@@ -207,14 +215,129 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 
   const postId = postData.id as string;
 
-  // 4. Genera copertina cartoon con next/og e caricala su Supabase
+  // 4. Fetch foto da Unsplash
+  let photoDataUrl: string | null = null;
+  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+  if (unsplashKey) {
+    try {
+      const query = article.unsplash_query || "pizza artisan professional";
+      const uRes = await fetch(
+        `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape&content_filter=high&client_id=${unsplashKey}`,
+        { headers: { "Accept-Version": "v1" } }
+      );
+      if (uRes.ok) {
+        const uData = await uRes.json() as { urls?: { regular?: string } };
+        const imgUrl = uData.urls?.regular;
+        if (imgUrl) {
+          const photoRes = await fetch(imgUrl);
+          if (photoRes.ok) {
+            const photoBuffer = await photoRes.arrayBuffer();
+            const mime = photoRes.headers.get("content-type") ?? "image/jpeg";
+            photoDataUrl = `data:${mime};base64,${Buffer.from(photoBuffer).toString("base64")}`;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[blog-cron] Unsplash fetch failed:", e);
+    }
+  }
+
+  // 5. Genera copertina e caricala su Supabase
   let coverUrl = "";
   try {
     const titleLen = article.title.length;
     const titleSize = titleLen < 30 ? 90 : titleLen < 50 ? 72 : titleLen < 70 ? 58 : 46;
 
     const imgRes = new ImageResponse(
-      (
+      photoDataUrl ? (
+        // Versione con foto reale Unsplash + overlay branding
+        <div
+          style={{
+            width: 1600,
+            height: 840,
+            display: "flex",
+            position: "relative",
+            backgroundImage: `url(${photoDataUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            fontFamily: "sans-serif",
+          }}
+        >
+          {/* Gradient overlay scuro dal basso */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.80) 70%, rgba(0,0,0,0.90) 100%)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
+          >
+            {/* Badge header */}
+            <div style={{ padding: "48px 64px", display: "flex" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  background: "rgba(200,116,30,0.95)",
+                  padding: "12px 28px",
+                  borderRadius: 50,
+                }}
+              >
+                <span style={{ fontSize: 28 }}>🍕</span>
+                <span
+                  style={{
+                    color: "#fff",
+                    fontSize: 20,
+                    fontWeight: "bold",
+                    letterSpacing: 3,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Consulenza Pizzaiolo
+                </span>
+              </div>
+            </div>
+
+            {/* Testo in basso */}
+            <div style={{ padding: "0 80px 64px", display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  fontSize: titleSize,
+                  fontWeight: "bold",
+                  color: "#fff",
+                  lineHeight: 1.2,
+                  maxWidth: 1400,
+                }}
+              >
+                {article.title}
+              </div>
+              {article.subtitle && (
+                <div
+                  style={{
+                    fontSize: 32,
+                    color: "#f0a04b",
+                    fontStyle: "italic",
+                    maxWidth: 1200,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {article.subtitle}
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10 }}>
+                <div style={{ width: 4, height: 28, background: "#c8741e", borderRadius: 2 }} />
+                <span style={{ fontSize: 22, color: "rgba(255,255,255,0.60)", letterSpacing: 1 }}>
+                  consulenzapizzaiolo.it
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Fallback cartoon (senza Unsplash configurato)
         <div
           style={{
             width: 1600,
@@ -225,7 +348,6 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
             fontFamily: "sans-serif",
           }}
         >
-          {/* Header arancione */}
           <div
             style={{
               background: "#c8741e",
@@ -249,7 +371,6 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
             </span>
           </div>
 
-          {/* Contenuto centrale */}
           <div
             style={{
               flex: 1,
@@ -289,7 +410,6 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
             )}
           </div>
 
-          {/* Footer scuro */}
           <div
             style={{
               background: "#3d2b1a",
@@ -327,7 +447,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     console.error("Cover generation failed:", e);
   }
 
-  // 5. Invia email con articolo completo
+  // 6. Invia email con articolo completo
   const adminUrl = `https://www.consulenzapizzaiolo.it/admin?edit=${postId}`;
   const articleHtml = mdToHtml(article.content);
 
@@ -394,7 +514,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     emailSent = emailRes.ok;
   }
 
-  console.log(`[blog-cron] Articolo creato: "${article.title}" (${postId}) — email: ${emailSent}`);
+  console.log(`[blog-cron] Articolo creato: "${article.title}" (${postId}) — categoria: ${article.category} — foto Unsplash: ${photoDataUrl ? "sì" : "no"} — email: ${emailSent}`);
 }
 
 export async function GET(req: NextRequest) {
