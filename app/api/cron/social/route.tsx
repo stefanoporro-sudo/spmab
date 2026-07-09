@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
 
+export const maxDuration = 60;
+
 const VALID_SLOTS = ["11:00", "16:00", "19:00"];
 
 function isAuthorized(req: NextRequest): boolean {

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
 
+export const maxDuration = 60;
+
 function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
