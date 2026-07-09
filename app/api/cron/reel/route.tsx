@@ -43,7 +43,9 @@ async function pickLeastUsedAngle(): Promise<Angle> {
   for (const row of data ?? []) {
     if (row.angle && counts[row.angle] !== undefined) counts[row.angle]++;
   }
-  return ANGLES.reduce((min, a) => (counts[a] < counts[min] ? a : min), ANGLES[0]);
+  const min = Math.min(...ANGLES.map((a) => counts[a]));
+  const tied = ANGLES.filter((a) => counts[a] === min);
+  return tied[Math.floor(Math.random() * tied.length)];
 }
 
 async function pickBestCandidate<T extends { id: string }>(
@@ -67,18 +69,17 @@ async function pickBestCandidate<T extends { id: string }>(
     lastUsedBySource.set(row.source_id, row.created_at);
   }
 
-  let best: T | null = null;
   let bestCount = Infinity;
   for (const c of candidates) {
     const usedCount = anglesBySource.get(c.id)?.size ?? 0;
-    if (usedCount < bestCount) {
-      best = c;
-      bestCount = usedCount;
-    }
+    if (usedCount < bestCount) bestCount = usedCount;
   }
 
-  if (best && bestCount < ANGLES.length) {
-    return { chosen: best, usedAngles: Array.from(anglesBySource.get(best.id) ?? []) as Angle[] };
+  if (bestCount < ANGLES.length) {
+    // Tra le fonti a pari merito (stesso numero di angoli usati), sceglie a caso invece di prendere sempre la prima
+    const tied = candidates.filter((c) => (anglesBySource.get(c.id)?.size ?? 0) === bestCount);
+    const chosen = tied[Math.floor(Math.random() * tied.length)];
+    return { chosen, usedAngles: Array.from(anglesBySource.get(chosen.id) ?? []) as Angle[] };
   }
 
   // Tutte le fonti hanno esaurito i 6 angoli: ripiega sulla meno usata di recente
