@@ -53,6 +53,68 @@ function mdToHtml(md: string): string {
   return out.join("\n");
 }
 
+// Genera un'immagine con Stability AI e la restituisce come base64 data URL
+async function fetchStabilityImage(prompt: string): Promise<string | null> {
+  const apiKey = process.env.STABILITY_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const form = new FormData();
+    form.append("prompt", prompt);
+    form.append("aspect_ratio", "16:9");
+    form.append("output_format", "jpeg");
+
+    const res = await fetch("https://api.stability.ai/v2beta/stable-image/generate/core", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "image/*",
+      },
+      body: form,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[blog-cron] Stability AI error:", res.status, err);
+      return null;
+    }
+
+    const buffer = await res.arrayBuffer();
+    return `data:image/jpeg;base64,${Buffer.from(buffer).toString("base64")}`;
+  } catch (e) {
+    console.error("[blog-cron] Stability AI fetch failed:", e);
+    return null;
+  }
+}
+
+// Fallback: foto reale da Unsplash
+async function fetchUnsplashImage(query: string): Promise<string | null> {
+  const apiKey = process.env.UNSPLASH_ACCESS_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(
+      `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape&content_filter=high&client_id=${apiKey}`,
+      { headers: { "Accept-Version": "v1" } }
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json() as { urls?: { regular?: string } };
+    const imgUrl = data.urls?.regular;
+    if (!imgUrl) return null;
+
+    const photoRes = await fetch(imgUrl);
+    if (!photoRes.ok) return null;
+
+    const mime = photoRes.headers.get("content-type") ?? "image/jpeg";
+    const buf = await photoRes.arrayBuffer();
+    return `data:${mime};base64,${Buffer.from(buf).toString("base64")}`;
+  } catch (e) {
+    console.error("[blog-cron] Unsplash fetch failed:", e);
+    return null;
+  }
+}
+
 async function generateArticle() {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -74,7 +136,7 @@ async function generateArticle() {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 2500,
+      max_tokens: 2800,
       messages: [
         {
           role: "user",
@@ -117,7 +179,8 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   "subtitle": "Breve sottotitolo 5-8 parole",
   "excerpt": "1-2 frasi di anteprima per il blog",
   "category": "Una di: Pizza|Panificazione|Business|Generale|Consulenza",
-  "unsplash_query": "2-3 English keywords for Unsplash photo (e.g. 'pizza wood fire artisan' or 'sourdough bread bakery flour')",
+  "image_prompt": "Prompt in inglese per generare la foto copertina con AI. Stile cinematografico premium, colori caldi ambrati, ambiente pizzeria o laboratorio artigianale professionale, persone nella scena solo se pertinenti all'argomento, illuminazione calda e professionale, deep focus con bokeh morbido, nessun testo o scritta nell'immagine, orientamento orizzontale 16:9. Esempio struttura: 'Cinematic wide-angle shot of [soggetto specifico all'articolo], warm amber lighting, professional Italian pizzeria or bakery setting, [dettagli rilevanti], shallow depth of field, no text, no logos, award-winning food photography'",
+  "unsplash_query": "2-3 English keywords for Unsplash fallback (e.g. 'pizza artisan wood fire')",
   "content": "Contenuto completo dell'articolo..."
 }`,
         },
@@ -140,6 +203,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     excerpt: string;
     content: string;
     category: string;
+    image_prompt: string;
     unsplash_query: string;
   };
   try {
@@ -215,42 +279,30 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 
   const postId = postData.id as string;
 
-  // 4. Fetch foto da Unsplash
+  // 4. Genera/recupera immagine di sfondo
+  // Priorità: Stability AI → Unsplash → cartoon fallback
   let photoDataUrl: string | null = null;
-  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
-  if (unsplashKey) {
-    try {
-      const query = article.unsplash_query || "pizza artisan professional";
-      const uRes = await fetch(
-        `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape&content_filter=high&client_id=${unsplashKey}`,
-        { headers: { "Accept-Version": "v1" } }
-      );
-      if (uRes.ok) {
-        const uData = await uRes.json() as { urls?: { regular?: string } };
-        const imgUrl = uData.urls?.regular;
-        if (imgUrl) {
-          const photoRes = await fetch(imgUrl);
-          if (photoRes.ok) {
-            const photoBuffer = await photoRes.arrayBuffer();
-            const mime = photoRes.headers.get("content-type") ?? "image/jpeg";
-            photoDataUrl = `data:${mime};base64,${Buffer.from(photoBuffer).toString("base64")}`;
-          }
-        }
-      }
-    } catch (e) {
-      console.error("[blog-cron] Unsplash fetch failed:", e);
-    }
+  let imageSource = "cartoon";
+
+  if (article.image_prompt) {
+    photoDataUrl = await fetchStabilityImage(article.image_prompt);
+    if (photoDataUrl) imageSource = "stability";
   }
 
-  // 5. Genera copertina e caricala su Supabase
+  if (!photoDataUrl && article.unsplash_query) {
+    photoDataUrl = await fetchUnsplashImage(article.unsplash_query);
+    if (photoDataUrl) imageSource = "unsplash";
+  }
+
+  // 5. Genera copertina 1600×840 e caricala su Supabase
   let coverUrl = "";
   try {
     const titleLen = article.title.length;
-    const titleSize = titleLen < 30 ? 90 : titleLen < 50 ? 72 : titleLen < 70 ? 58 : 46;
+    const titleSize = titleLen < 30 ? 88 : titleLen < 50 ? 70 : titleLen < 70 ? 56 : 44;
 
     const imgRes = new ImageResponse(
       photoDataUrl ? (
-        // Versione con foto reale Unsplash + overlay branding
+        // Versione con foto reale (Stability AI o Unsplash) + overlay branding
         <div
           style={{
             width: 1600,
@@ -263,30 +315,31 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
             fontFamily: "sans-serif",
           }}
         >
-          {/* Gradient overlay scuro dal basso */}
+          {/* Gradient overlay: leggero in alto, scuro in basso per leggibilità del titolo */}
           <div
             style={{
               position: "absolute",
               top: 0, left: 0, right: 0, bottom: 0,
-              background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.80) 70%, rgba(0,0,0,0.90) 100%)",
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.20) 35%, rgba(0,0,0,0.72) 65%, rgba(0,0,0,0.88) 100%)",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
             }}
           >
-            {/* Badge header */}
+            {/* Badge header in alto a sinistra */}
             <div style={{ padding: "48px 64px", display: "flex" }}>
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 14,
-                  background: "rgba(200,116,30,0.95)",
+                  background: "rgba(200,116,30,0.92)",
                   padding: "12px 28px",
                   borderRadius: 50,
+                  backdropFilter: "blur(4px)",
                 }}
               >
-                <span style={{ fontSize: 28 }}>🍕</span>
+                <span style={{ fontSize: 26 }}>🍕</span>
                 <span
                   style={{
                     color: "#fff",
@@ -301,15 +354,16 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
               </div>
             </div>
 
-            {/* Testo in basso */}
-            <div style={{ padding: "0 80px 64px", display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Titolo e URL in basso */}
+            <div style={{ padding: "0 80px 68px", display: "flex", flexDirection: "column", gap: 18 }}>
               <div
                 style={{
                   fontSize: titleSize,
                   fontWeight: "bold",
-                  color: "#fff",
-                  lineHeight: 1.2,
-                  maxWidth: 1400,
+                  color: "#ffffff",
+                  lineHeight: 1.18,
+                  maxWidth: 1380,
+                  textShadow: "0 2px 12px rgba(0,0,0,0.5)",
                 }}
               >
                 {article.title}
@@ -317,19 +371,27 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
               {article.subtitle && (
                 <div
                   style={{
-                    fontSize: 32,
-                    color: "#f0a04b",
+                    fontSize: 30,
+                    color: "#f5b26b",
                     fontStyle: "italic",
                     maxWidth: 1200,
-                    lineHeight: 1.3,
+                    lineHeight: 1.35,
+                    textShadow: "0 1px 8px rgba(0,0,0,0.4)",
                   }}
                 >
                   {article.subtitle}
                 </div>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10 }}>
-                <div style={{ width: 4, height: 28, background: "#c8741e", borderRadius: 2 }} />
-                <span style={{ fontSize: 22, color: "rgba(255,255,255,0.60)", letterSpacing: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 6 }}>
+                <div style={{ width: 4, height: 30, background: "#c8741e", borderRadius: 3 }} />
+                <span
+                  style={{
+                    fontSize: 22,
+                    color: "rgba(255,255,255,0.58)",
+                    letterSpacing: 1.5,
+                    textTransform: "lowercase",
+                  }}
+                >
                   consulenzapizzaiolo.it
                 </span>
               </div>
@@ -337,7 +399,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
           </div>
         </div>
       ) : (
-        // Fallback cartoon (senza Unsplash configurato)
+        // Fallback cartoon (nessuna API configurata)
         <div
           style={{
             width: 1600,
@@ -514,7 +576,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     emailSent = emailRes.ok;
   }
 
-  console.log(`[blog-cron] Articolo creato: "${article.title}" (${postId}) — categoria: ${article.category} — foto Unsplash: ${photoDataUrl ? "sì" : "no"} — email: ${emailSent}`);
+  console.log(`[blog-cron] Articolo creato: "${article.title}" (${postId}) — categoria: ${article.category} — immagine: ${imageSource} — email: ${emailSent}`);
 }
 
 export async function GET(req: NextRequest) {
