@@ -116,6 +116,14 @@ async function fetchUnsplashImage(query: string): Promise<string | null> {
 }
 
 async function generateArticle() {
+  try {
+    return await _generateArticle();
+  } catch (e) {
+    console.error("[blog-cron] FATAL ERROR in generateArticle:", e);
+  }
+}
+
+async function _generateArticle() {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY mancante" }, { status: 500 });
@@ -136,7 +144,7 @@ async function generateArticle() {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 2800,
+      max_tokens: 4000,
       messages: [
         {
           role: "user",
@@ -179,8 +187,8 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   "subtitle": "Breve sottotitolo 5-8 parole",
   "excerpt": "1-2 frasi di anteprima per il blog",
   "category": "Una di: Pizza|Panificazione|Business|Generale|Consulenza",
-  "image_prompt": "Prompt in inglese per generare la foto copertina con AI. Stile cinematografico premium, colori caldi ambrati, ambiente pizzeria o laboratorio artigianale professionale, persone nella scena solo se pertinenti all'argomento, illuminazione calda e professionale, deep focus con bokeh morbido, nessun testo o scritta nell'immagine, orientamento orizzontale 16:9. Esempio struttura: 'Cinematic wide-angle shot of [soggetto specifico all'articolo], warm amber lighting, professional Italian pizzeria or bakery setting, [dettagli rilevanti], shallow depth of field, no text, no logos, award-winning food photography'",
-  "unsplash_query": "2-3 English keywords for Unsplash fallback (e.g. 'pizza artisan wood fire')",
+  "image_prompt": "Cinematic [soggetto specifico], warm amber light, Italian pizzeria or bakery, professional, no text, no logos",
+  "unsplash_query": "2-3 English keywords",
   "content": "Contenuto completo dell'articolo..."
 }`,
         },
