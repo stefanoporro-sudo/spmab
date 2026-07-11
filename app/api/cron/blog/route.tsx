@@ -56,21 +56,38 @@ function mdToHtml(md: string): string {
 // Genera un'immagine con Stability AI e la restituisce come base64 data URL
 async function fetchStabilityImage(prompt: string): Promise<string | null> {
   const apiKey = process.env.STABILITY_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.log("[blog-cron] STABILITY_API_KEY non configurata, salto Stability AI");
+    return null;
+  }
 
   try {
-    const form = new FormData();
-    form.append("prompt", prompt);
-    form.append("aspect_ratio", "16:9");
-    form.append("output_format", "jpeg");
+    // Costruzione manuale del multipart/form-data (più affidabile in Vercel Node.js)
+    const boundary = `StabilityBoundary${Date.now()}`;
+    const CRLF = "\r\n";
+    const field = (name: string, value: string) =>
+      `--${boundary}${CRLF}Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}${value}${CRLF}`;
+
+    const bodyStr = [
+      field("prompt", prompt),
+      field("aspect_ratio", "16:9"),
+      field("output_format", "jpeg"),
+      `--${boundary}--${CRLF}`,
+    ].join("");
+
+    const bodyBuf = Buffer.from(bodyStr, "utf-8");
+
+    console.log("[blog-cron] Chiamata Stability AI, prompt:", prompt.slice(0, 80));
 
     const res = await fetch("https://api.stability.ai/v2beta/stable-image/generate/core", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         Accept: "image/*",
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": String(bodyBuf.length),
       },
-      body: form,
+      body: bodyBuf,
     });
 
     if (!res.ok) {
@@ -79,8 +96,11 @@ async function fetchStabilityImage(prompt: string): Promise<string | null> {
       return null;
     }
 
+    const contentType = res.headers.get("content-type") ?? "image/jpeg";
     const buffer = await res.arrayBuffer();
-    return `data:image/jpeg;base64,${Buffer.from(buffer).toString("base64")}`;
+    const b64 = Buffer.from(buffer).toString("base64");
+    console.log(`[blog-cron] Stability AI OK: ${contentType}, ${buffer.byteLength} bytes`);
+    return `data:${contentType};base64,${b64}`;
   } catch (e) {
     console.error("[blog-cron] Stability AI fetch failed:", e);
     return null;
