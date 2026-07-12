@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
+import { generateSocialCard } from "@/lib/social-image";
 
 export const maxDuration = 60;
 
@@ -256,11 +257,14 @@ REGOLE OBBLIGATORIE:
 - Usa sempre "fermentazione" al posto di "maturazione" (parola vietata)
 - NON affermare mai che la fermentazione migliora la digeribilità della pizza: è falso
 
+Aggiungi anche 3-4 punti chiave brevissimi (massimo 6-7 parole ciascuno) che riassumano il messaggio centrale della caption, da mettere in un'immagine di riepilogo.
+
 Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
   "caption": "testo della caption con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
-  "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita"
+  "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
+  "bullets": ["punto chiave 1", "punto chiave 2", "punto chiave 3"]
 }`,
         },
       ],
@@ -275,7 +279,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   const claudeData = await claudeRes.json();
   const rawText = (claudeData.content[0].text as string).trim();
 
-  let parsed: { caption: string; hashtags: string[]; angle: string };
+  let parsed: { caption: string; hashtags: string[]; angle: string; bullets?: string[] };
   try {
     parsed = extractJson(rawText);
   } catch {
@@ -290,6 +294,26 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   const caption = `${sanitize(parsed.caption)}\n\n${hashtagsLine}`;
   const angle = ANGLES.includes(parsed.angle as Angle) ? parsed.angle : (source.forcedAngle ?? null);
 
+  let imageUrl = "";
+  try {
+    const bullets = (parsed.bullets ?? []).slice(0, 4).map(sanitize);
+    if (bullets.length) {
+      const buffer = await generateSocialCard("Post — Consulenza Pizzaiolo", bullets);
+      const fileName = `img-${Date.now()}-card.png`;
+      const { error: uploadErr } = await supabase.storage
+        .from("social")
+        .upload(fileName, buffer, { contentType: "image/png", upsert: false });
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from("social").getPublicUrl(fileName);
+        imageUrl = urlData.publicUrl;
+      } else {
+        console.error("[social-cron] Errore upload immagine:", uploadErr.message);
+      }
+    }
+  } catch (e) {
+    console.error("[social-cron] Generazione immagine fallita:", e);
+  }
+
   const { data: draft, error } = await supabase
     .from("social_posts")
     .insert({
@@ -297,7 +321,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
       source_id: source.sourceId,
       angle,
       caption,
-      image_url: "",
+      image_url: imageUrl,
       scheduled_slot: slot,
       status: "draft",
     })
@@ -327,11 +351,12 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
     </div>
     <div style="padding:28px 32px;">
       <p style="color:#888;font-style:italic;font-size:13px;margin:0 0 16px;">Fonte: ${fonteLabel}${source.title ? ` — ${source.title}` : ""} · angolo: ${angle ?? "n/d"}</p>
+      ${imageUrl ? `<img src="${imageUrl}" alt="Immagine post" style="width:100%;border-radius:8px;margin-bottom:20px"/>` : ""}
       <div style="font-size:15px;color:#333;white-space:pre-wrap;line-height:1.6;">${caption}</div>
     </div>
     <div style="margin:0 32px 24px;padding:20px;background:#fff8f0;border:1px solid #f5ddb0;border-radius:8px;text-align:center;">
       <div style="font-size:14px;color:#555;margin-bottom:16px;">
-        📸 Manca ancora l'immagine — caricala nel pannello prima di poter approvare e pubblicare.
+        ${imageUrl ? "🖼️ Immagine generata automaticamente — sostituiscila nel pannello se preferisci una foto tua." : "📸 Manca ancora l'immagine — caricala nel pannello prima di poter approvare e pubblicare."}
       </div>
       <a href="${adminUrl}" style="display:inline-block;background:#c8741e;color:#fff;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">
         Apri nel pannello →

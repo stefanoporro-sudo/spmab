@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
+import { generateSocialCard } from "@/lib/social-image";
 
 export const maxDuration = 60;
 
@@ -268,11 +269,14 @@ REGOLE OBBLIGATORIE:
 - Usa sempre "fermentazione" al posto di "maturazione" (parola vietata)
 - NON affermare mai che la fermentazione migliora la digeribilità della pizza: è falso
 
+Aggiungi anche 3-4 punti chiave brevissimi (massimo 6-7 parole ciascuno) che riassumano il messaggio centrale della caption, da mettere in un'immagine di riepilogo.
+
 Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
   "caption": "testo della caption con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
-  "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita"
+  "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
+  "bullets": ["punto chiave 1", "punto chiave 2", "punto chiave 3"]
 }`,
         },
       ],
@@ -287,7 +291,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   const claudeData = await claudeRes.json();
   const rawText = (claudeData.content[0].text as string).trim();
 
-  let parsed: { caption: string; hashtags: string[]; angle: string };
+  let parsed: { caption: string; hashtags: string[]; angle: string; bullets?: string[] };
   try {
     parsed = extractJson(rawText);
   } catch {
@@ -302,6 +306,26 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   const caption = `${sanitize(parsed.caption)}\n\n${hashtagsLine}`;
   const angle = ANGLES.includes(parsed.angle as Angle) ? parsed.angle : (source.forcedAngle ?? null);
 
+  let imageUrl = "";
+  try {
+    const bullets = (parsed.bullets ?? []).slice(0, 4).map(sanitize);
+    if (bullets.length) {
+      const buffer = await generateSocialCard("Reel — Consulenza Pizzaiolo", bullets);
+      const fileName = `img-${Date.now()}-card.png`;
+      const { error: uploadErr } = await supabase.storage
+        .from("social")
+        .upload(fileName, buffer, { contentType: "image/png", upsert: false });
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from("social").getPublicUrl(fileName);
+        imageUrl = urlData.publicUrl;
+      } else {
+        console.error("[reel-cron] Errore upload immagine:", uploadErr.message);
+      }
+    }
+  } catch (e) {
+    console.error("[reel-cron] Generazione immagine fallita:", e);
+  }
+
   const { data: draft, error } = await supabase
     .from("social_posts")
     .insert({
@@ -310,7 +334,7 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
       content_type: "reel",
       angle,
       caption,
-      image_url: "",
+      image_url: imageUrl,
       scheduled_slot: "19:00",
       status: "draft",
     })
@@ -327,8 +351,12 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   const fonteLabel =
     source.sourceType === "post" ? "articolo blog" : source.sourceType === "recipe" ? "ricetta" : "contenuto originale";
 
+  const imageNote = imageUrl
+    ? "🖼️ Immagine generata automaticamente — sostituiscila nel pannello se preferisci un video/foto tua.\n\n"
+    : "";
+
   await sendTelegramMessage(
-    `🎬 <b>Nuovo Reel da revisionare</b>\n\nFonte: ${fonteLabel}${source.title ? ` — ${source.title}` : ""} · angolo: ${angle ?? "n/d"}\n\n${preview}\n\n<a href="${adminUrl}">Apri nel pannello</a>`
+    `🎬 <b>Nuovo Reel da revisionare</b>\n\nFonte: ${fonteLabel}${source.title ? ` — ${source.title}` : ""} · angolo: ${angle ?? "n/d"}\n\n${imageNote}${preview}\n\n<a href="${adminUrl}">Apri nel pannello</a>`
   );
 
   console.log(`[reel-cron] Bozza creata (${draft.id}) fonte=${source.sourceType}:${source.sourceId} angolo=${angle}`);
