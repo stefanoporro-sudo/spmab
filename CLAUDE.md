@@ -38,6 +38,7 @@ Due sistemi effettivi (la cartella `.github/workflows` esiste ma è vuota — Gi
 | Report statistiche | `/api/cron/daily-report` | ogni giorno 9:00 CEST |
 | Bozza post social | `/api/cron/social?slot=11:00\|16:00\|19:00` | ogni giorno 11:00, 16:00, 19:00 CEST — trigger da **cron-job.org** (non vercel.json, gestisce nativamente il cambio ora legale) |
 | Bozza Reel | `/api/cron/reel` | lun-ven 19:00 CEST — trigger da **cron-job.org**, notifica via Telegram (non email) |
+| Bozza LinkedIn | `/api/cron/linkedin` | lun/mer/ven 08:30 CEST — trigger da **cron-job.org**, notifica via Telegram, tono più professionale/B2B, nessuna pubblicazione via API (LinkedIn non permette l'automazione self-service come Meta) |
 
 Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e genera l'articolo in background. L'email con la bozza arriva a **porroste80@gmail.com**.
 
@@ -48,7 +49,7 @@ Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e
 - `page_views` — visite al sito
 - `forum_threads` — discussioni community
 - `forum_replies` — risposte forum
-- `social_posts` — bozze di post Instagram/Facebook (caption generata da Claude, immagine caricata a mano, stati `draft/approved/publishing/published/failed/rejected`). Colonna `content_type` (`post`/`reel`) distingue i post foto (pubblicati via Meta API) dai Reel (caption pronta da copiare, pubblicazione sempre manuale in Instagram — l'API Instagram non permette di scegliere musica dal catalogo). Colonna `source_type` (`post`/`recipe`/`standalone`) indica se la caption parte da un articolo blog, una ricetta, o è un contenuto originale (`source_id` è null in quel caso). Colonna `angle` traccia quale delle 6 categorie tematiche (tecnica, ingredienti, attrezzatura, business, storia, gourmet) è stata usata, per evitare di ripetere lo stesso angolo sulla stessa fonte
+- `social_posts` — bozze di post Instagram/Facebook/LinkedIn (caption generata da Claude, immagine generata automaticamente, stati `draft/approved/publishing/published/failed/rejected`). Colonna `content_type` (`post`/`reel`/`linkedin`) distingue i post foto (pubblicati via Meta API) da Reel e LinkedIn (caption pronta da copiare, pubblicazione sempre manuale — né Instagram né LinkedIn permettono l'automazione completa self-service per questi casi). Colonna `source_type` (`post`/`recipe`/`standalone`) indica se la caption parte da un articolo blog, una ricetta, o è un contenuto originale (`source_id` è null in quel caso). Colonna `angle` traccia quale delle 10 categorie tematiche è stata usata, per evitare di ripetere lo stesso angolo sulla stessa fonte
 
 ## Storage Supabase (bucket)
 - `blog` — copertine articoli (PNG 1600×840)
@@ -61,6 +62,8 @@ Il cron `/api/cron/social` genera 3 volte al giorno una bozza di caption (altern
 Il Page Access Token Meta scade ogni 60 giorni: il cron `daily-report` controlla la scadenza (`debug_token`) e invia un'email di avviso se mancano meno di 7 giorni.
 
 **Reel**: il cron `/api/cron/reel` genera lun-ven alle 19:00 solo la caption (stile "hook" per video, più corta di un post normale) e notifica via **Telegram** (non email). Non c'è pubblicazione via Meta API: Stefano copia la caption pronta dal pannello (bottone "Copia caption"), monta il Reel con musica direttamente in Instagram, e poi clicca "Segna come pubblicato" per tracciarlo — l'API Instagram non permette di scegliere un brano dal catalogo musicale in automatico.
+
+**LinkedIn**: il cron `/api/cron/linkedin` genera lun/mer/ven alle 08:30 un post con tono più professionale (paragrafi brevi, 3-5 hashtag di settore, pensato anche per decisori B2B — scuole, catene di ristorazione) e notifica via Telegram. Come per i Reel, nessuna pubblicazione via API: LinkedIn richiede un'approvazione da partner ufficiale per l'automazione self-service, non ottenibile realisticamente per un singolo consulente — stesso flusso "Copia caption" + "Segna come pubblicato".
 
 **Anti-ripetizione (fonte × angolo)**: post e Reel condividono lo stesso pool di contenuti (`posts` + `recipes`) a un ritmo di produzione molto più veloce di quanto blog/ricette crescano, quindi il riciclo delle fonti è inevitabile. Per non risultare ripetitivi: (1) **2 generazioni su 3** sono **contenuto standalone** — non partono da un articolo/ricetta esistente, ma scrivono direttamente su una delle 10 categorie tematiche sotto; solo 1 su 3 pesca da blog/ricette (alternati tra loro); (2) per le generazioni legate a un articolo/ricetta, la scelta della fonte privilegia quella che ha esaurito meno angoli possibili, e il prompt a Claude riceve esplicitamente quali angoli sono già stati usati su quella fonte specifica, per sceglierne uno diverso ogni volta.
 
