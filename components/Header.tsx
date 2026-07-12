@@ -10,7 +10,7 @@ const navLinks = [
   { href: "/blog", label: "Blog" },
   { href: "/ricette", label: "Ricette" },
   { href: "/consulenza-online", label: "Consulenza On Line" },
-  { href: "/tecnico-formatore", label: "Formazione Tecnica" },
+  { href: "/tecnico-formatore", label: "Formazione" },
   { href: "/community", label: "Community" },
   { href: "/#contatti", label: "Contatti" },
 ];
