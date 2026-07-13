@@ -103,7 +103,7 @@ async function publishToFacebook(imageUrl: string, caption: string) {
   return data;
 }
 
-const LINKEDIN_VERSION = "202401";
+const LINKEDIN_VERSION = "202606";
 
 class LinkedInApiError extends Error {
   kind: "token" | "other";
