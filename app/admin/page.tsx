@@ -1434,7 +1434,7 @@ setAuthenticated(true);
                           </button>
                         )}
 
-                        {p.content_type !== "post" ? (
+                        {p.content_type === "reel" ? (
                           <>
                             {p.status !== "published" && (
                               <button

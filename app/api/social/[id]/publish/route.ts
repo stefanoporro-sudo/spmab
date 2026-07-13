@@ -103,6 +103,81 @@ async function publishToFacebook(imageUrl: string, caption: string) {
   return data;
 }
 
+const LINKEDIN_VERSION = "202401";
+
+class LinkedInApiError extends Error {
+  kind: "token" | "other";
+  raw: unknown;
+  constructor(kind: "token" | "other", raw: unknown, message: string) {
+    super(message);
+    this.kind = kind;
+    this.raw = raw;
+  }
+}
+
+async function publishToLinkedIn(imageUrl: string, caption: string) {
+  const token = process.env.LINKEDIN_ACCESS_TOKEN;
+  const memberUrn = process.env.LINKEDIN_MEMBER_URN;
+  if (!token || !memberUrn) {
+    throw new LinkedInApiError("other", null, "LINKEDIN_ACCESS_TOKEN o LINKEDIN_MEMBER_URN mancanti");
+  }
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "LinkedIn-Version": LINKEDIN_VERSION,
+    "X-Restli-Protocol-Version": "2.0.0",
+    "Content-Type": "application/json",
+  };
+
+  const initRes = await fetch("https://api.linkedin.com/rest/images?action=initializeUpload", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ initializeUploadRequest: { owner: memberUrn } }),
+  });
+  const initData = await initRes.json();
+  if (!initRes.ok) {
+    const isTokenError = initRes.status === 401;
+    throw new LinkedInApiError(isTokenError ? "token" : "other", initData, initData?.message ?? "Errore nell'avvio upload immagine LinkedIn");
+  }
+
+  const uploadUrl = initData.value.uploadUrl;
+  const imageUrn = initData.value.image;
+
+  const imageRes = await fetch(imageUrl);
+  const imageBuffer = await imageRes.arrayBuffer();
+  const uploadRes = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: imageBuffer,
+  });
+  if (!uploadRes.ok) {
+    throw new LinkedInApiError("other", null, "Errore nel caricamento dell'immagine su LinkedIn");
+  }
+
+  const postRes = await fetch("https://api.linkedin.com/rest/posts", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      author: memberUrn,
+      commentary: caption,
+      visibility: "PUBLIC",
+      distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] },
+      content: { media: { id: imageUrn } },
+      lifecycleState: "PUBLISHED",
+      isReshareDisabledByAuthor: false,
+    }),
+  });
+
+  if (!postRes.ok) {
+    const postData = await postRes.json().catch(() => null);
+    const isTokenError = postRes.status === 401;
+    throw new LinkedInApiError(isTokenError ? "token" : "other", postData, postData?.message ?? "Errore nella pubblicazione del post LinkedIn");
+  }
+
+  const postId = postRes.headers.get("x-restli-id");
+  return { id: postId };
+}
+
 async function sendUrgentEmail(subject: string, message: string) {
   const resendKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
@@ -136,6 +211,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const dryRun = process.env.SOCIAL_DRY_RUN === "true";
+
+  if (post.content_type === "linkedin") {
+    if (dryRun) {
+      await supabase.from("social_posts").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id);
+      return NextResponse.json({ linkedin: { success: true, data: { id: "dry-run-linkedin" } }, status: "published" });
+    }
+    try {
+      const data = await publishToLinkedIn(post.image_url, post.caption);
+      await supabase
+        .from("social_posts")
+        .update({ status: "published", published_at: new Date().toISOString(), error_message: null })
+        .eq("id", id);
+      return NextResponse.json({ linkedin: { success: true, data }, status: "published" });
+    } catch (e) {
+      const err = e instanceof LinkedInApiError ? e : new LinkedInApiError("other", null, String(e));
+      await supabase.from("social_posts").update({ status: "failed", error_message: err.message }).eq("id", id);
+      if (err.kind === "token") {
+        await sendUrgentEmail(
+          "Token LinkedIn scaduto",
+          "La pubblicazione su LinkedIn è fallita per token scaduto. Rifai l'autorizzazione OAuth e aggiorna LINKEDIN_ACCESS_TOKEN su Vercel."
+        );
+      }
+      return NextResponse.json({ linkedin: { success: false, error: err.message }, status: "failed" }, { status: 500 });
+    }
+  }
+
   const platforms: string[] = post.platforms ?? ["instagram", "facebook"];
 
   const results: Record<string, { success: boolean; data?: unknown; error?: string }> = {};
