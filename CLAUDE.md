@@ -36,7 +36,7 @@ Due sistemi effettivi (la cartella `.github/workflows` esiste ma è vuota — Gi
 |-----|----------|--------|
 | Articolo blog | `/api/cron/blog` | lun-ven 8:30 CEST |
 | Report statistiche | `/api/cron/daily-report` | ogni giorno 9:00 CEST |
-| Bozza post social | `/api/cron/social?slot=11:00\|16:00\|19:00` | ogni giorno 11:00, 16:00, 19:00 CEST — trigger da **cron-job.org** (non vercel.json, gestisce nativamente il cambio ora legale) |
+| Bozza post social | `/api/cron/social?slot=12:00\|18:00\|20:30` | ogni giorno 12:00, 18:00, 20:30 CEST — trigger da **cron-job.org** (non vercel.json, gestisce nativamente il cambio ora legale). Orari scelti per intercettare le fasce di maggiore engagement food (pranzo, aperitivo, scroll serale) |
 | Bozza Reel | `/api/cron/reel` | lun-ven 19:00 CEST — trigger da **cron-job.org**, notifica via Telegram (non email) |
 | Bozza LinkedIn | `/api/cron/linkedin` | lun/mer/ven 08:30 CEST — trigger da **cron-job.org**, notifica via Telegram, tono più professionale/B2B, nessuna pubblicazione via API (LinkedIn non permette l'automazione self-service come Meta) |
 
@@ -57,7 +57,7 @@ Il cron blog usa `waitUntil` da `@vercel/functions` — risponde in <1 secondo e
 - `social` — immagini dei post social (JPG/PNG/WebP, max 8MB)
 
 ## Integrazione social (Instagram/Facebook)
-Il cron `/api/cron/social` genera 3 volte al giorno una bozza di caption (alternando articoli blog e ricette pubblicate) e la salva in `social_posts` con `status: draft`. **Non genera immagini automaticamente**: Stefano carica a mano una foto reale (o generata su richiesta in chat con Claude) dal pannello `/admin` → tab **Social**, prima di poter approvare. Solo dopo l'approvazione esplicita, il bottone "Pubblica ora" chiama `/api/social/[id]/publish`, che pubblica su Instagram e Facebook via Meta Graph API — nessuna pubblicazione è mai automatica.
+Il cron `/api/cron/social` genera 3 volte al giorno (12:00/18:00/20:30) una bozza di caption e **genera già anche un'immagine di riepilogo** (card grafica automatica via `lib/social-image.tsx`, vedi sezione "Anti-ripetizione" più sotto) e la salva in `social_posts` con `status: draft`. Stefano può sostituire l'immagine generata con una foto reale dal pannello `/admin` → tab **Social**, se preferisce. Solo dopo l'approvazione esplicita, il bottone "Pubblica ora" chiama `/api/social/[id]/publish`, che pubblica su Instagram e Facebook via Meta Graph API — nessuna pubblicazione è mai automatica senza approvazione.
 
 Il Page Access Token Meta scade ogni 60 giorni: il cron `daily-report` controlla la scadenza (`debug_token`) e invia un'email di avviso se mancano meno di 7 giorni.
 
