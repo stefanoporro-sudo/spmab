@@ -5,7 +5,7 @@ import { generateSocialCard } from "@/lib/social-image";
 
 export const maxDuration = 60;
 
-const VALID_SLOTS = ["11:00", "16:00", "19:00"];
+const VALID_SLOTS = ["12:00", "18:00", "20:30"];
 
 function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
@@ -389,7 +389,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const slot = req.nextUrl.searchParams.get("slot") ?? "11:00";
+  const slot = req.nextUrl.searchParams.get("slot") ?? "12:00";
   if (!VALID_SLOTS.includes(slot)) {
     return NextResponse.json({ error: "Slot non valido" }, { status: 400 });
   }
