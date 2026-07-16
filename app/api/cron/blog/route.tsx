@@ -173,19 +173,27 @@ async function _generateArticle() {
 Articoli già pubblicati (NON ripetere questi argomenti):
 ${existingTitles}
 
-Ultimi 6 articoli in ordine cronologico (i più recenti, usali per capire quale categoria è già stata sovra-usata di recente):
+Ultimi 10 articoli in ordine cronologico (usali per capire quale categoria è già stata sovra-usata di recente):
 ${recentTitles}
 
-Gli argomenti sono organizzati in 6 categorie. Individua quale categoria domina gli ultimi 6 articoli sopra, e scegli il prossimo argomento da una categoria DIVERSA (se due categorie sono ancora del tutto inedite, dai priorità a quelle). Non scegliere mai due articoli di fila dalla categoria "Tecnica e impasto": è la più facile da esaurire e tende a monopolizzare il blog se non bilanciata attivamente.
+Gli argomenti sono organizzati in 10 categorie. Regole di rotazione:
+- Scegli la categoria che appare MENO negli ultimi 10 articoli sopra
+- Se più categorie sono a pari merito, dai priorità a quelle del pane (7, 8) o ai nuovi formati (9, 10) — sono inedite e portano varietà reale
+- Non scegliere mai la stessa categoria degli ultimi 2 articoli
+- Le categorie 1 (Tecnica pizza) e 2 (Ingredienti pizza) tendono a monopolizzare: evitale se sono già presenti negli ultimi 3 articoli
 
-1. **Tecnica e impasto** (categoria app: Pizza): idratazione dell'impasto, biga e poolish, temperatura dell'acqua, il cornicione perfetto, autolisi, lievito madre, fermentazione (tempi e metodi), errori di cottura
-2. **Ingredienti e materie prime** (categoria app: Panificazione): il pomodoro giusto per la pizza, la mozzarella e la gestione dell'umidità, farine alternative (tipo 1, integrale, senza glutine), stagionalità degli ingredienti
-3. **Attrezzatura e ambiente di lavoro** (categoria app: Generale): scelta del forno, gestione della cella frigorifera, gli attrezzi del pizzaiolo, la pala da pizza
-4. **Business e gestione** (categoria app: Business): food cost, il menù della pizzeria, marketing per pizzeria, come gestire le recensioni online, gestione del personale in pizzeria
-5. **Cultura e storia** (categoria app: Consulenza): storia del grano e delle farine nel tempo, storia della pizza dalle origini a oggi, le differenze tra gli stili regionali italiani (napoletana, romana, in teglia, al padellino) e la loro origine storica
-6. **Ricette gourmet** (categoria app: Pizza): abbinamenti di farcitura non convenzionali, contaminazioni tra pizza e alta cucina, pizze gourmet stagionali con ingredienti di nicchia
+1. **Tecnica e impasto pizza** (categoria app: Pizza): idratazione, biga e poolish, temperatura acqua, cornicione, autolisi, lievito madre, fermentazione, errori di cottura
+2. **Ingredienti pizza** (categoria app: Panificazione): pomodoro, mozzarella e umidità, farine alternative, stagionalità degli ingredienti in pizzeria
+3. **Attrezzatura e ambiente** (categoria app: Generale): scelta del forno, cella frigorifera, attrezzi del pizzaiolo, pala da pizza, bilance e strumenti di precisione
+4. **Business pizzeria** (categoria app: Business): food cost, costruzione del menù, marketing locale, gestione recensioni, personale, listino prezzi, aprire una pizzeria
+5. **Cultura e storia pizza** (categoria app: Consulenza): storia del grano, origini della pizza, stili regionali italiani (napoletana, romana, in teglia, al padellino, al taglio), differenze tecniche e culturali
+6. **Ricette gourmet pizza** (categoria app: Pizza): abbinamenti non convenzionali, pizza e alta cucina, ingredienti di nicchia stagionali, pizze bianche creative
+7. **Pane artigianale italiano** (categoria app: Panificazione): varietà regionali (pane di Altamura DOP, pane toscano senza sale, ciabatta, pane di Matera, michetta milanese, grissini torinesi, coppia ferrarese, pane carasau sardo, focaccia genovese, pane di Lariano), storia, differenze di impasto e cottura tra Nord e Sud Italia
+8. **Ricette pane casalingo** (categoria app: Panificazione): come fare il pane in casa passo dopo passo, lievito madre per il pane, no-knead bread, focaccia casalinga, pane integrale, grissini fatti in casa — con spiegazioni su salubrità, benefici della fermentazione nel pane, perché fare il pane in casa conviene
+9. **Miti e luoghi comuni** (categoria app: Generale): falsi miti smontati con fatti ("il glutine fa male a tutti", "la pizza fa ingrassare", "il pane industriale è uguale all'artigianale", "più lievito = pizza più leggera", "la pizza napoletana è pesante") — tono diretto e scientifico
+10. **FAQ del pizzaiolo** (categoria app: Consulenza): domande reali di clienti e pizzaioli alle prime armi (quanto lievito usare, come conservare l'impasto, perché si bolla, come fotografare pizza e pane per i social, come capire se la fermentazione è pronta, cosa fare se l'impasto non lievita)
 
-Scegli UN argomento NUOVO (non ancora coperto) da una delle categorie sopra, rispettando la regola di rotazione.
+Scegli UN argomento NUOVO (non ancora coperto) da una delle 10 categorie sopra, rispettando la regola di rotazione.
 
 Scrivi un articolo in italiano, tono professionale ma accessibile, ~700-1000 parole.
 Formato:
