@@ -160,7 +160,7 @@ function extractJson(rawText: string): { caption: string; hashtags: string[]; an
   return JSON.parse(rawText.slice(start, end + 1));
 }
 
-async function getRecentTopicHistory(): Promise<string> {
+async function getRecentTopicHistory(): Promise<{ block: string; recentCaptions: string[] }> {
   const { data: blogPosts } = await supabase
     .from("posts")
     .select("title")
@@ -177,11 +177,30 @@ async function getRecentTopicHistory(): Promise<string> {
     .map((p) => `- ${p.caption.split("\n")[0].slice(0, 120)}`)
     .join("\n") || "Nessuno";
 
-  return `Titoli di TUTTI gli articoli blog già pubblicati (compresi quelli non usati finora per i social):
+  const block = `Titoli di TUTTI gli articoli blog già pubblicati (compresi quelli non usati finora per i social):
 ${blogTitles}
 
 Apertura delle ultime caption social/Reel già create (comprese quelle rifiutate da Stefano — se un argomento specifico è già qui, evitalo, vuol dire che è già stato trattato o non è piaciuto):
 ${socialSnippets}`;
+
+  return { block, recentCaptions: (recentSocial ?? []).map((p) => p.caption as string) };
+}
+
+function normalizeOpening(text: string): string {
+  return text
+    .split("\n")[0]
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 8)
+    .join(" ");
+}
+
+function openingCollides(caption: string, recentCaptions: string[]): boolean {
+  const newOpening = normalizeOpening(caption);
+  if (!newOpening) return false;
+  return recentCaptions.some((c) => normalizeOpening(c) === newOpening);
 }
 
 function buildContentPrompt(source: SourceContent, history: string): string {
@@ -218,22 +237,9 @@ Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero
 ${historyBlock}`;
 }
 
-async function generateDraft(slot: string) {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) {
-    console.error("[social-cron] ANTHROPIC_API_KEY mancante");
-    return;
-  }
+type ParsedCaption = { caption: string; hashtags: string[]; angle: string; bullets?: string[] };
 
-  const source = await pickSource();
-  if (!source) {
-    console.error("[social-cron] Nessun contenuto disponibile (post/ricette)");
-    return;
-  }
-
-  const history = await getRecentTopicHistory();
-  const contentPrompt = buildContentPrompt(source, history);
-
+async function callClaudeForCaption(anthropicKey: string, promptBody: string): Promise<ParsedCaption | null> {
   const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -244,13 +250,31 @@ async function generateDraft(slot: string) {
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 800,
-      messages: [
-        {
-          role: "user",
-          content: `Sei il social media manager di Stefano Porro, consulente pizzaiolo (consulenzapizzaiolo.it).
+      messages: [{ role: "user", content: promptBody }],
+    }),
+  });
+
+  if (!claudeRes.ok) {
+    console.error("[social-cron] Errore Claude API", await claudeRes.text());
+    return null;
+  }
+
+  const claudeData = await claudeRes.json();
+  const rawText = (claudeData.content[0].text as string).trim();
+
+  try {
+    return extractJson(rawText);
+  } catch {
+    console.error("[social-cron] Claude non ha restituito JSON valido", rawText);
+    return null;
+  }
+}
+
+function buildFullPrompt(contentPrompt: string, retryNote?: string): string {
+  return `Sei il social media manager di Stefano Porro, consulente pizzaiolo (consulenzapizzaiolo.it).
 
 ${contentPrompt}
-
+${retryNote ?? ""}
 Tono onesto e diretto, niente fuffa da corsi costosi, coerente con un brand che smonta le mode. 150-300 parole, in italiano, con una CTA finale verso consulenzapizzaiolo.it o l'invito a seguire Stefano. 5-8 hashtag pertinenti al mondo pizza/ristorazione.
 
 REGOLE OBBLIGATORIE:
@@ -265,26 +289,33 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   "hashtags": ["hashtag1", "hashtag2"],
   "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
   "bullets": ["punto chiave 1", "punto chiave 2", "punto chiave 3"]
-}`,
-        },
-      ],
-    }),
-  });
+}`;
+}
 
-  if (!claudeRes.ok) {
-    console.error("[social-cron] Errore Claude API", await claudeRes.text());
+async function generateDraft(slot: string) {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    console.error("[social-cron] ANTHROPIC_API_KEY mancante");
     return;
   }
 
-  const claudeData = await claudeRes.json();
-  const rawText = (claudeData.content[0].text as string).trim();
-
-  let parsed: { caption: string; hashtags: string[]; angle: string; bullets?: string[] };
-  try {
-    parsed = extractJson(rawText);
-  } catch {
-    console.error("[social-cron] Claude non ha restituito JSON valido", rawText);
+  const source = await pickSource();
+  if (!source) {
+    console.error("[social-cron] Nessun contenuto disponibile (post/ricette)");
     return;
+  }
+
+  const history = await getRecentTopicHistory();
+  const contentPrompt = buildContentPrompt(source, history.block);
+
+  let parsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt));
+  if (!parsed) return;
+
+  if (openingCollides(parsed.caption, history.recentCaptions)) {
+    console.warn("[social-cron] Apertura identica a una caption recente, rigenero");
+    const retryNote = `\nATTENZIONE: la tua prima bozza per questa richiesta iniziava con "${parsed.caption.split("\n")[0]}", una frase già usata in una caption recente. Riscrivi un'apertura COMPLETAMENTE diversa, mai vista sopra — cambia le prime parole, non solo il resto del testo.\n`;
+    const retryParsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt, retryNote));
+    if (retryParsed) parsed = retryParsed;
   }
 
   const sanitize = (t: string) =>
