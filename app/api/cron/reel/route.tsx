@@ -18,16 +18,16 @@ function isAuthorized(req: NextRequest): boolean {
 const ANGLES = ["tecnica", "ingredienti", "attrezzatura", "business", "storia", "gourmet", "miti", "faq", "avviare", "vita"] as const;
 type Angle = (typeof ANGLES)[number];
 
-const ANGLE_CATEGORIES = `1. tecnica — Tecnica e impasto (idratazione, biga e poolish, temperatura dell'acqua, cornicione, autolisi, lievito madre, fermentazione, errori di cottura)
-2. ingredienti — Ingredienti e materie prime (il pomodoro giusto, la mozzarella e l'umidità, farine alternative, stagionalità)
-3. attrezzatura — Attrezzatura e ambiente di lavoro (scelta del forno, cella frigorifera, attrezzi del pizzaiolo, la pala)
-4. business — Business e gestione di una pizzeria già avviata (food cost, il menù, marketing, recensioni online, gestione del personale)
-5. storia — Cultura e storia (storia del grano e delle farine, storia della pizza, differenze tra stili regionali italiani)
-6. gourmet — Ricette gourmet (abbinamenti non convenzionali, contaminazioni con l'alta cucina, pizze gourmet stagionali)
+const ANGLE_CATEGORIES = `1. tecnica — Tecnica e impasto (idratazione, biga e poolish, gestione della biga a lunga fermentazione, temperatura dell'acqua, il ruolo dell'acqua e la sua durezza/pH, cornicione, autolisi, lievito madre, fermentazione, errori di cottura, il ruolo del malto, staglio e puntatura, differenza tra impasto diretto e indiretto, errori nella gestione delle farciture pre/post cottura)
+2. ingredienti — Ingredienti e materie prime (il pomodoro giusto, stagionalità del pomodoro e alternative fuori stagione, la mozzarella e l'umidità, farine alternative, differenza tra farina 00, 0 e integrale nella resa, come leggere una scheda tecnica della farina (W, P/L), il ruolo dell'olio EVO, le sfide reali della pizza senza glutine, stagionalità)
+3. attrezzatura — Attrezzatura e ambiente di lavoro (scelta del forno, manutenzione ordinaria del forno, cella frigorifera, attrezzi del pizzaiolo, la pala)
+4. business — Business e gestione di una pizzeria già avviata (food cost, come calcolare il prezzo di una pizza dal food cost reale, il menù, marketing, recensioni online, il ruolo dei social nella scelta della pizzeria da parte del cliente, gestione del personale, gestione del rush del sabato sera, come formare un nuovo pizzaiolo assunto in due settimane, sostenibilità e sprechi in pizzeria)
+5. storia — Cultura e storia (storia del grano e delle farine, storia della pizza, differenze tra stili regionali italiani, la filosofia della lunga lievitazione e alta idratazione diffusa da Gabriele Bonci, l'eredità di Gabriele Bonci nel rendere la pizza al taglio romana un prodotto gourmet popolare)
+6. gourmet — Ricette gourmet (abbinamenti non convenzionali, contaminazioni con l'alta cucina, pizze gourmet stagionali, l'approccio alla pizza gourmet ma popolare in stile Gabriele Bonci, l'attenzione alla selezione e tracciabilità delle farine come nell'approccio di Bonci, il principio "meno ingredienti, più qualità" nella farcitura)
 7. miti — Miti e disinformazione sulla pizza (falsi miti generali, es. "il forno a legna è sempre meglio dell'elettrico", "la pizza gourmet è solo marketing")
-8. faq — Domande frequenti dei clienti (perché costa di più, tempi di attesa, opzioni senza glutine, cosa chiedono spesso al banco)
-9. avviare — Aprire e avviare una pizzeria (errori tipici dei primi mesi, business plan, scelte iniziali)
-10. vita — Vita da pizzaiolo (dietro le quinte, giornata tipo, aneddoti personali)`;
+8. faq — Domande frequenti dei clienti (perché costa di più, tempi di attesa, opzioni senza glutine, come gestire allergie e intolleranze in menù, differenza tra pizza al piatto e pizza al taglio nella gestione del servizio, cosa chiedono spesso al banco)
+9. avviare — Aprire e avviare una pizzeria o un percorso di formazione tecnica (errori tipici dei primi mesi, business plan, scelte iniziali, storie generiche di aperture riuscite)
+10. vita — Vita da pizzaiolo/formatore (dietro le quinte, giornata tipo, aneddoti personali)`;
 
 type SourceContent = {
   sourceType: "post" | "recipe" | "standalone";
@@ -292,6 +292,7 @@ A differenza di un post normale, un Reel si guarda in video: le prime parole del
 REGOLE OBBLIGATORIE:
 - Usa sempre "fermentazione" al posto di "maturazione" (parola vietata)
 - NON affermare mai che la fermentazione migliora la digeribilità della pizza: è falso
+- Se parli dell'approccio di Gabriele Bonci, resta sugli aspetti pubblicamente noti (alta idratazione, lunga lievitazione, tracciabilità delle farine, pizza al taglio gourmet popolare): non inventare mai citazioni dirette o dichiarazioni che non gli siano realmente attribuite
 
 Aggiungi anche 3-4 punti chiave brevissimi (massimo 6-7 parole ciascuno) che riassumano il messaggio centrale della caption, da mettere in un'immagine di riepilogo.
 
