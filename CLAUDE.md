@@ -75,6 +75,8 @@ Le 10 categorie (`angle`): tecnica (impasto), ingredienti, attrezzatura, busines
 
 (3) Ogni generazione riceve anche i titoli di **tutti** gli articoli blog pubblicati e l'apertura delle ultime 15 caption social/Reel già create — comprese quelle **rifiutate** da Stefano — con l'istruzione di non ritrattare lo stesso argomento specifico (es. "autolisi") anche se l'angolo è diverso. Per questo motivo il bottone "Rifiuta" nel pannello admin non elimina più la riga (`status: rejected`, non una DELETE): la storia va preservata perché il sistema la usa per evitare di riproporre argomenti già scartati.
 
+**Rigenera argomento**: nel pannello admin, accanto a "Rifiuta", il bottone "Rigenera argomento" (`app/api/social/[id]/regenerate/route.ts`) rifiuta la bozza corrente (stesso `status: rejected` di cui sopra — resta quindi in memoria per l'anti-ripetizione, così quel tipo di argomento non ricompare nei prossimi post) e richiama subito il cron corrispondente (`/api/cron/social|reel|linkedin`, stesso slot per i post) per generarne una nuova: arriva una nuova notifica (email o Telegram) come una generazione normale.
+
 ## Regole contenuto importanti
 - Usare sempre **"fermentazione"** — mai "maturazione"
 - **Non affermare** che la fermentazione migliora la digeribilità della pizza: è falso. La digeribilità dipende principalmente dalla farcitura e dalla cottura.

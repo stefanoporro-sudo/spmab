@@ -148,6 +148,7 @@ export default function AdminPage() {
   const [uploadingSocialId, setUploadingSocialId] = useState<string | null>(null);
   const [publishingSocialId, setPublishingSocialId] = useState<string | null>(null);
   const [deletingSocialId, setDeletingSocialId] = useState<string | null>(null);
+  const [regeneratingSocialId, setRegeneratingSocialId] = useState<string | null>(null);
   const [socialError, setSocialError] = useState("");
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState("");
@@ -335,6 +336,16 @@ setAuthenticated(true);
     setDeletingSocialId(id);
     await updateSocialPost(id, { status: "rejected" });
     setDeletingSocialId(null);
+  };
+
+  const regenerateSocialTopic = async (id: string) => {
+    setRegeneratingSocialId(id);
+    setSocialError("");
+    const res = await fetch(`/api/social/${id}/regenerate`, { method: "POST", headers: { "x-admin-password": password } });
+    const data = await res.json();
+    setRegeneratingSocialId(null);
+    if (!res.ok) setSocialError(data.error ?? "Errore nella rigenerazione.");
+    fetchSocialPosts();
   };
 
   const copySocialCaption = async (id: string, caption: string) => {
@@ -1538,6 +1549,20 @@ setAuthenticated(true);
                               </button>
                             )}
                           </>
+                        )}
+
+                        {p.status !== "published" && p.status !== "rejected" && (
+                          <button
+                            onClick={() => regenerateSocialTopic(p.id)}
+                            disabled={regeneratingSocialId === p.id}
+                            title="Scarta questo argomento e fanne generare subito uno nuovo (arriverà una nuova notifica)"
+                            className="border border-dark-500 text-gray-400 hover:text-brand-400 hover:border-brand-500/40 rounded-lg px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
+                          >
+                            {regeneratingSocialId === p.id
+                              ? <Loader2 size={12} className="inline animate-spin mr-1" />
+                              : <RefreshCw size={12} className="inline mr-1" />}
+                            Rigenera argomento
+                          </button>
                         )}
 
                         {p.status !== "published" && p.status !== "rejected" && (
