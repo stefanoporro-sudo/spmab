@@ -108,9 +108,12 @@ export default function AdminPage() {
     ingredienti: "",
     procedimento: "",
     note: "",
+    creatore_id: "self",
+    dish_image: "",
   });
   const [pdfFiles, setPdfFiles] = useState<{ name: string; url: string }[]>([]);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [uploadingDishImage, setUploadingDishImage] = useState(false);
   const [savingToDB, setSavingToDB] = useState(false);
   const [savedToDB, setSavedToDB] = useState(false);
 
@@ -490,7 +493,7 @@ setAuthenticated(true);
 
   useEffect(() => {
     if (authenticated && tab === "ricette") { fetchRecipes(); fetchPdfFiles(); fetchCollaborators(); }
-    if (authenticated && tab === "pdf") fetchPdfFiles();
+    if (authenticated && tab === "pdf") { fetchPdfFiles(); fetchCollaborators(); }
     if (authenticated && tab === "blog") fetchPosts();
     if (authenticated && tab === "social") fetchSocialPosts();
     if (authenticated && tab === "recensioni") fetchTestimonials();
@@ -686,9 +689,24 @@ setAuthenticated(true);
     a.click();
   };
 
+  // ── Upload dish image for PDF ────────────────────────────────────
+  const uploadDishImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingDishImage(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/recipes/upload", { method: "POST", headers: { "x-admin-password": password }, body: fd });
+    const data = await res.json();
+    if (data.url) setPdfForm(f => ({ ...f, dish_image: data.url }));
+    setUploadingDishImage(false);
+    e.target.value = "";
+  };
+
   // ── Generate PDF ─────────────────────────────────────────────────
   const generatePDF = () => {
-    const logoUrl = `${window.location.origin}/logo.png`;
+    const selectedCollab = collaborators.find(c => c.id === pdfForm.creatore_id);
+    const creatoreName = selectedCollab ? selectedCollab.name : "Stefano Porro";
     const html = `<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -718,9 +736,12 @@ setAuthenticated(true);
 </head>
 <body>
   <div class="header">
-    <img src="${logoUrl}" style="height:60px;max-width:160px;object-fit:contain;" />
+    ${pdfForm.dish_image
+      ? `<img src="${pdfForm.dish_image}" style="height:80px;width:120px;object-fit:cover;border-radius:10px;flex-shrink:0;" />`
+      : `<div style="width:120px;flex-shrink:0;"></div>`
+    }
     <div class="header-right">
-      <strong>Stefano Porro — Consulenza Pizzaiolo</strong><br/>
+      <strong>${creatoreName} — Consulenza Pizzaiolo</strong><br/>
       Consulenza Pizzaiolo & Panificazione<br/>
       +39 393 360 2014<br/>
       consulenzapizzaiolo.it
@@ -756,7 +777,7 @@ setAuthenticated(true);
   </div>` : ""}
 
   <div class="footer">
-    <span>© ${new Date().getFullYear()} Consulenza Pizzaiolo — Stefano Porro</span>
+    <span>© ${new Date().getFullYear()} Consulenza Pizzaiolo — ${creatoreName}</span>
     <span><strong>consulenzapizzaiolo.it</strong> · stefano@consulenzapizzaiolo.it</span>
   </div>
 </body>
@@ -1159,6 +1180,43 @@ setAuthenticated(true);
                     >
                       {LEVELS.map((l) => <option key={l} value={l} className="bg-dark-700">{l}</option>)}
                     </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Creatore</label>
+                    <select
+                      value={pdfForm.creatore_id}
+                      onChange={(e) => setPdfForm({ ...pdfForm, creatore_id: e.target.value })}
+                      className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                    >
+                      <option value="self" className="bg-dark-700">Stefano Porro</option>
+                      {collaborators.map((c) => (
+                        <option key={c.id} value={c.id} className="bg-dark-700">{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Foto piatto (opzionale)</label>
+                    <div className="flex items-center gap-3">
+                      <label className="cursor-pointer inline-flex items-center gap-2 bg-dark-700 hover:bg-dark-600 border border-dark-500 text-gray-300 px-3 py-3 rounded-xl text-sm transition-colors flex-1 justify-center">
+                        {uploadingDishImage ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                        {uploadingDishImage ? "Caricamento..." : pdfForm.dish_image ? "Cambia foto" : "Carica foto"}
+                        <input type="file" accept="image/*" onChange={uploadDishImage} className="hidden" disabled={uploadingDishImage} />
+                      </label>
+                      {pdfForm.dish_image && (
+                        <button
+                          onClick={() => setPdfForm(f => ({ ...f, dish_image: "" }))}
+                          className="w-10 h-10 flex-shrink-0 rounded-xl bg-dark-700 hover:bg-red-500/20 text-gray-500 hover:text-red-400 flex items-center justify-center transition-colors border border-dark-500"
+                          title="Rimuovi foto"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    {pdfForm.dish_image && (
+                      <img src={pdfForm.dish_image} alt="Foto piatto" className="mt-2 h-14 w-full object-cover rounded-lg border border-dark-500" />
+                    )}
                   </div>
                 </div>
               </div>
