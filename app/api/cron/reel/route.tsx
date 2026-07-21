@@ -36,7 +36,27 @@ type SourceContent = {
   summary: string;
   usedAngles: Angle[];
   forcedAngle?: Angle;
+  forcedSubtopic?: string;
 };
+
+const BONCI_SUBTOPICS = [
+  "la filosofia della lunga lievitazione e alta idratazione diffusa da Gabriele Bonci",
+  "l'eredità di Gabriele Bonci nel rendere la pizza al taglio romana un prodotto gourmet popolare",
+  "l'approccio alla pizza gourmet ma popolare in stile Gabriele Bonci",
+  "l'attenzione alla selezione e tracciabilità delle farine come nell'approccio di Bonci",
+  "il principio \"meno ingredienti, più qualità\" nella farcitura, in stile Bonci",
+];
+
+async function shouldForceBonci(): Promise<boolean> {
+  const { data } = await supabase
+    .from("social_posts")
+    .select("subtopic, caption")
+    .order("created_at", { ascending: false })
+    .limit(30);
+  return !(data ?? []).some(
+    (row) => (row.subtopic ?? "").toLowerCase().includes("bonci") || (row.caption ?? "").toLowerCase().includes("bonci")
+  );
+}
 
 async function pickLeastUsedAngle(): Promise<Angle> {
   const { data } = await supabase.from("social_posts").select("angle");
@@ -102,7 +122,11 @@ async function pickSource(): Promise<SourceContent | null> {
   // 1 generazione su 3 pesca da blog/ricette (alternati), 2 su 3 sono contenuto standalone
   if (n % 3 !== 0) {
     const angle = await pickLeastUsedAngle();
-    return { sourceType: "standalone", sourceId: null, title: "", summary: "", usedAngles: [], forcedAngle: angle };
+    let forcedSubtopic: string | undefined;
+    if ((angle === "storia" || angle === "gourmet") && (await shouldForceBonci())) {
+      forcedSubtopic = BONCI_SUBTOPICS[Math.floor(Math.random() * BONCI_SUBTOPICS.length)];
+    }
+    return { sourceType: "standalone", sourceId: null, title: "", summary: "", usedAngles: [], forcedAngle: angle, forcedSubtopic };
   }
 
   const useRecipe = Math.floor(n / 3) % 2 === 1;
@@ -252,12 +276,16 @@ ${subtopicsByAngle}
 Dichiara nel campo "subtopic" una frase breve (3-6 parole) che descriva lo specifico sotto-argomento/tesi che hai scelto per QUESTA caption, diverso da quelli elencati sopra per lo stesso angolo.`;
 
   if (source.sourceType === "standalone") {
+    const forcedSubtopicBlock = source.forcedSubtopic
+      ? `\nSOTTO-ARGOMENTO GIÀ ASSEGNATO (obbligatorio, non sceglierne un altro): ${source.forcedSubtopic}. Scrivi la caption specificamente su questo tema — resta sugli aspetti pubblicamente noti, senza inventare citazioni dirette. Nel campo "subtopic" della risposta usa questa stessa frase (o una lieve riformulazione che la mantenga riconoscibile).\n`
+      : "";
+
     return `Scrivi una caption per un Reel Instagram/Facebook come contenuto originale (non parte da un articolo specifico del sito), sul seguente angolo:
 
 ${ANGLE_CATEGORIES}
 
 Angolo da trattare: "${source.forcedAngle}" (usa esattamente questo valore nel campo "angle" della risposta).
-
+${forcedSubtopicBlock}
 ${historyBlock}
 
 Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, se non sei sicuro di un dettaglio storico resta sul generico piuttosto che inventare date o nomi.`;
