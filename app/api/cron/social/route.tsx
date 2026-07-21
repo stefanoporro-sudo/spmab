@@ -128,7 +128,8 @@ async function pickSource(): Promise<SourceContent | null> {
   const { data: recipes } = await supabase
     .from("recipes")
     .select("id, title, description, category")
-    .eq("active", true);
+    .eq("active", true)
+    .is("collaborator_id", null);
   const result = await pickBestCandidate(recipes ?? [], "recipe");
   if (!result) return null;
   return {
@@ -140,7 +141,7 @@ async function pickSource(): Promise<SourceContent | null> {
   };
 }
 
-function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string } {
+function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string } {
   const start = rawText.indexOf("{");
   if (start === -1) throw new Error("no {");
   let depth = 0;
@@ -186,6 +187,31 @@ ${socialSnippets}`;
   return { block, recentCaptions: (recentSocial ?? []).map((p) => p.caption as string) };
 }
 
+async function getRecentSubtopicsByAngle(): Promise<{ block: string; byAngle: Map<string, string[]> }> {
+  const { data } = await supabase
+    .from("social_posts")
+    .select("angle, subtopic, created_at")
+    .order("created_at", { ascending: false })
+    .limit(40);
+
+  const byAngle = new Map<string, string[]>();
+  for (const row of data ?? []) {
+    if (!row.angle || !row.subtopic) continue;
+    if (!byAngle.has(row.angle)) byAngle.set(row.angle, []);
+    const list = byAngle.get(row.angle)!;
+    if (list.length < 8) list.push(row.subtopic as string);
+  }
+
+  const block =
+    byAngle.size === 0
+      ? "Nessun sotto-argomento specifico usato finora."
+      : Array.from(byAngle.entries())
+          .map(([angle, subtopics]) => `- ${angle}: ${subtopics.join(" | ")}`)
+          .join("\n");
+
+  return { block, byAngle };
+}
+
 function normalizeOpening(text: string): string {
   return text
     .split("\n")[0]
@@ -203,10 +229,15 @@ function openingCollides(caption: string, recentCaptions: string[]): boolean {
   return recentCaptions.some((c) => normalizeOpening(c) === newOpening);
 }
 
-function buildContentPrompt(source: SourceContent, history: string): string {
+function buildContentPrompt(source: SourceContent, history: string, subtopicsByAngle: string): string {
   const historyBlock = `${history}
 
-IMPORTANTE: anche se l'angolo/categoria è diverso, NON ritrattare uno specifico argomento/tecnica (es. "autolisi", "biga e poolish") già coperto in dettaglio in uno dei titoli o caption sopra. Se il tema è già stato trattato, scegli un sotto-argomento distinto o un taglio narrativo chiaramente diverso.`;
+IMPORTANTE: anche se l'angolo/categoria è diverso, NON ritrattare uno specifico argomento/tecnica (es. "autolisi", "biga e poolish") già coperto in dettaglio in uno dei titoli o caption sopra. Se il tema è già stato trattato, scegli un sotto-argomento distinto o un taglio narrativo chiaramente diverso.
+
+Sotto-argomenti specifici già usati di recente per ciascun angolo (NON riusare la stessa tesi/argomento centrale, anche riformulato — scegline uno diverso della stessa categoria):
+${subtopicsByAngle}
+
+Dichiara nel campo "subtopic" una frase breve (3-6 parole) che descriva lo specifico sotto-argomento/tesi che hai scelto per QUESTA caption, diverso da quelli elencati sopra per lo stesso angolo.`;
 
   if (source.sourceType === "standalone") {
     return `Scrivi una caption per un post Instagram/Facebook come contenuto originale (non parte da un articolo specifico del sito), sul seguente angolo:
@@ -237,7 +268,7 @@ Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero
 ${historyBlock}`;
 }
 
-type ParsedCaption = { caption: string; hashtags: string[]; angle: string; bullets?: string[] };
+type ParsedCaption = { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string };
 
 async function callClaudeForCaption(anthropicKey: string, promptBody: string): Promise<ParsedCaption | null> {
   const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -289,8 +320,20 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   "caption": "testo della caption con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
   "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
-  "bullets": ["punto chiave 1", "punto chiave 2", "punto chiave 3"]
+  "bullets": ["punto chiave 1", "punto chiave 2", "punto chiave 3"],
+  "subtopic": "breve descrizione del sotto-argomento/tesi scelto (3-6 parole)"
 }`;
+}
+
+function normalizeSubtopic(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").trim();
+}
+
+function subtopicCollides(subtopic: string | undefined, angle: string, subtopicsByAngleRaw: Map<string, string[]>): boolean {
+  if (!subtopic) return false;
+  const used = subtopicsByAngleRaw.get(angle) ?? [];
+  const normalizedNew = normalizeSubtopic(subtopic);
+  return used.some((s) => normalizeSubtopic(s) === normalizedNew);
 }
 
 async function generateDraft(slot: string) {
@@ -307,14 +350,19 @@ async function generateDraft(slot: string) {
   }
 
   const history = await getRecentTopicHistory();
-  const contentPrompt = buildContentPrompt(source, history.block);
+  const subtopics = await getRecentSubtopicsByAngle();
+  const contentPrompt = buildContentPrompt(source, history.block, subtopics.block);
 
   let parsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt));
   if (!parsed) return;
 
-  if (openingCollides(parsed.caption, history.recentCaptions)) {
-    console.warn("[social-cron] Apertura identica a una caption recente, rigenero");
-    const retryNote = `\nATTENZIONE: la tua prima bozza per questa richiesta iniziava con "${parsed.caption.split("\n")[0]}", una frase già usata in una caption recente. Riscrivi un'apertura COMPLETAMENTE diversa, mai vista sopra — cambia le prime parole, non solo il resto del testo.\n`;
+  const collides =
+    openingCollides(parsed.caption, history.recentCaptions) ||
+    subtopicCollides(parsed.subtopic, parsed.angle, subtopics.byAngle);
+
+  if (collides) {
+    console.warn("[social-cron] Apertura o sotto-argomento già usati di recente, rigenero");
+    const retryNote = `\nATTENZIONE: la tua prima bozza per questa richiesta iniziava con "${parsed.caption.split("\n")[0]}" e trattava il sotto-argomento "${parsed.subtopic ?? "n/d"}" — entrambi già usati di recente. Riscrivi con un'apertura E una tesi centrale COMPLETAMENTE diverse, mai viste sopra.\n`;
     const retryParsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt, retryNote));
     if (retryParsed) parsed = retryParsed;
   }
@@ -352,6 +400,7 @@ async function generateDraft(slot: string) {
       source_type: source.sourceType,
       source_id: source.sourceId,
       angle,
+      subtopic: parsed.subtopic ?? null,
       caption,
       image_url: imageUrl,
       scheduled_slot: slot,
