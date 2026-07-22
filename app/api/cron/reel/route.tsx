@@ -37,6 +37,7 @@ type SourceContent = {
   usedAngles: Angle[];
   forcedAngle?: Angle;
   forcedSubtopic?: string;
+  lastUsedAngle?: string | null;
 };
 
 const BONCI_SUBTOPICS = [
@@ -58,15 +59,25 @@ async function shouldForceBonci(): Promise<boolean> {
   );
 }
 
-async function pickLeastUsedAngle(): Promise<Angle> {
+async function pickLeastUsedAngle(avoid?: string | null): Promise<Angle> {
   const { data } = await supabase.from("social_posts").select("angle");
   const counts: Record<string, number> = Object.fromEntries(ANGLES.map((a) => [a, 0]));
   for (const row of data ?? []) {
     if (row.angle && counts[row.angle] !== undefined) counts[row.angle]++;
   }
   const min = Math.min(...ANGLES.map((a) => counts[a]));
-  const tied = ANGLES.filter((a) => counts[a] === min);
+  let tied = ANGLES.filter((a) => counts[a] === min);
+  if (avoid && tied.length > 1) tied = tied.filter((a) => a !== avoid);
   return tied[Math.floor(Math.random() * tied.length)];
+}
+
+async function getLastUsedAngle(): Promise<string | null> {
+  const { data } = await supabase
+    .from("social_posts")
+    .select("angle")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  return data?.[0]?.angle ?? null;
 }
 
 async function pickBestCandidate<T extends { id: string }>(
@@ -118,15 +129,16 @@ async function pickSource(): Promise<SourceContent | null> {
     .from("social_posts")
     .select("*", { count: "exact", head: true });
   const n = count ?? 0;
+  const lastUsedAngle = await getLastUsedAngle();
 
   // 1 generazione su 3 pesca da blog/ricette (alternati), 2 su 3 sono contenuto standalone
   if (n % 3 !== 0) {
-    const angle = await pickLeastUsedAngle();
+    const angle = await pickLeastUsedAngle(lastUsedAngle);
     let forcedSubtopic: string | undefined;
     if ((angle === "storia" || angle === "gourmet") && (await shouldForceBonci())) {
       forcedSubtopic = BONCI_SUBTOPICS[Math.floor(Math.random() * BONCI_SUBTOPICS.length)];
     }
-    return { sourceType: "standalone", sourceId: null, title: "", summary: "", usedAngles: [], forcedAngle: angle, forcedSubtopic };
+    return { sourceType: "standalone", sourceId: null, title: "", summary: "", usedAngles: [], forcedAngle: angle, forcedSubtopic, lastUsedAngle };
   }
 
   const useRecipe = Math.floor(n / 3) % 2 === 1;
@@ -144,6 +156,7 @@ async function pickSource(): Promise<SourceContent | null> {
       title: result.chosen.title,
       summary: result.chosen.excerpt,
       usedAngles: result.usedAngles,
+      lastUsedAngle,
     };
   }
 
@@ -160,10 +173,11 @@ async function pickSource(): Promise<SourceContent | null> {
     title: result.chosen.title,
     summary: result.chosen.description || result.chosen.category,
     usedAngles: result.usedAngles,
+    lastUsedAngle,
   };
 }
 
-function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string } {
+function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string; subtopic_is_similar_to_recent?: boolean } {
   const start = rawText.indexOf("{");
   if (start === -1) throw new Error("no {");
   let depth = 0;
@@ -273,7 +287,9 @@ IMPORTANTE: anche se l'angolo/categoria è diverso, NON ritrattare uno specifico
 Sotto-argomenti specifici già usati di recente per ciascun angolo (NON riusare la stessa tesi/argomento centrale, anche riformulato — scegline uno diverso della stessa categoria):
 ${subtopicsByAngle}
 
-Dichiara nel campo "subtopic" una frase breve (3-6 parole) che descriva lo specifico sotto-argomento/tesi che hai scelto per QUESTA caption, diverso da quelli elencati sopra per lo stesso angolo.`;
+Dichiara nel campo "subtopic" una frase breve (3-6 parole) che descriva lo specifico sotto-argomento/tesi che hai scelto per QUESTA caption, diverso da quelli elencati sopra per lo stesso angolo.
+
+ATTENZIONE — il confronto con i sotto-argomenti sopra deve essere sul SIGNIFICATO, non sulle parole usate: due tesi che raccontano la stessa idea di fondo con parole diverse (es. "differenze tra pizza napoletana e romana" e "origini degli stili regionali italiani" sono la STESSA tesi, solo riformulata) contano come ripetizione. Prima di rispondere, controlla onestamente se la tua tesi è concettualmente la stessa di una già elencata per questo angolo; imposta il campo "subtopic_is_similar_to_recent" a true se lo è (anche solo in parte), false se è davvero un'idea distinta.`;
 
   if (source.sourceType === "standalone") {
     const forcedSubtopicBlock = source.forcedSubtopic
@@ -291,9 +307,13 @@ ${historyBlock}
 Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, se non sei sicuro di un dettaglio storico resta sul generico piuttosto che inventare date o nomi.`;
   }
 
-  const avoidBlock = source.usedAngles.length
+  const avoidBlock = `${source.usedAngles.length
     ? `Angoli già usati per questa fonte (NON riusarli se possibile): ${source.usedAngles.join(", ")}.`
-    : "Nessun angolo ancora usato per questa fonte.";
+    : "Nessun angolo ancora usato per questa fonte."}${
+    source.lastUsedAngle
+      ? `\nATTENZIONE: l'ultimo angolo usato in assoluto (indipendentemente dalla fonte, anche su un altro articolo/ricetta) è "${source.lastUsedAngle}" — NON sceglierlo di nuovo per questa generazione anche se per questa fonte specifica risulta libero: serve varietà tra una pubblicazione e l'altra, non solo per singola fonte.`
+      : ""
+  }`;
 
   return `Scrivi una caption per un Reel Instagram/Facebook a partire da questo contenuto del sito:
 Titolo: ${source.title}
@@ -308,35 +328,39 @@ Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero
 ${historyBlock}`;
 }
 
-type ParsedCaption = { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string };
+type ParsedCaption = { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string; subtopic_is_similar_to_recent?: boolean };
 
 async function callClaudeForCaption(anthropicKey: string, promptBody: string): Promise<ParsedCaption | null> {
-  const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 600,
-      messages: [{ role: "user", content: promptBody }],
-    }),
-  });
-
-  if (!claudeRes.ok) {
-    console.error("[reel-cron] Errore Claude API", await claudeRes.text());
-    return null;
-  }
-
-  const claudeData = await claudeRes.json();
-  const rawText = (claudeData.content[0].text as string).trim();
-
   try {
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 600,
+        messages: [{ role: "user", content: promptBody }],
+      }),
+    });
+
+    if (!claudeRes.ok) {
+      console.error("[reel-cron] Errore Claude API", await claudeRes.text());
+      return null;
+    }
+
+    const claudeData = await claudeRes.json();
+    const rawText = (claudeData?.content?.[0]?.text as string | undefined)?.trim();
+    if (!rawText) {
+      console.error("[reel-cron] Risposta Claude senza testo", JSON.stringify(claudeData));
+      return null;
+    }
+
     return extractJson(rawText);
-  } catch {
-    console.error("[reel-cron] Claude non ha restituito JSON valido", rawText);
+  } catch (e) {
+    console.error("[reel-cron] Errore chiamata/parsing Claude", e);
     return null;
   }
 }
@@ -361,7 +385,8 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
   "hashtags": ["hashtag1", "hashtag2"],
   "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
   "bullets": ["punto chiave 1", "punto chiave 2", "punto chiave 3"],
-  "subtopic": "breve descrizione del sotto-argomento/tesi scelto (3-6 parole)"
+  "subtopic": "breve descrizione del sotto-argomento/tesi scelto (3-6 parole)",
+  "subtopic_is_similar_to_recent": false
 }`;
 }
 
@@ -376,37 +401,60 @@ function subtopicCollides(subtopic: string | undefined, angle: string, subtopics
   return used.some((s) => normalizeSubtopic(s) === normalizedNew);
 }
 
+async function notifyFailure(reason: string) {
+  await sendTelegramMessage(`⚠️ <b>Generazione Reel fallita</b>\n\nMotivo: ${reason}\n\nNessuna bozza è stata creata.`);
+}
+
 async function generateDraft() {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     console.error("[reel-cron] ANTHROPIC_API_KEY mancante");
+    await notifyFailure("ANTHROPIC_API_KEY mancante");
     return;
   }
 
-  const source = await pickSource();
-  if (!source) {
-    console.error("[reel-cron] Nessun contenuto disponibile (post/ricette)");
-    return;
+  try {
+    const source = await pickSource();
+    if (!source) {
+      console.error("[reel-cron] Nessun contenuto disponibile (post/ricette)");
+      await notifyFailure("nessun contenuto disponibile (post/ricette)");
+      return;
+    }
+
+    const history = await getRecentTopicHistory();
+    const subtopics = await getRecentSubtopicsByAngle();
+    const contentPrompt = buildContentPrompt(source, history.block, subtopics.block);
+
+    let parsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt));
+    if (!parsed) {
+      await notifyFailure("Claude non ha risposto o la risposta non era in JSON valido (vedi log Vercel)");
+      return;
+    }
+
+    const collides =
+      openingCollides(parsed.caption, history.recentCaptions) ||
+      subtopicCollides(parsed.subtopic, parsed.angle, subtopics.byAngle) ||
+      parsed.subtopic_is_similar_to_recent === true ||
+      (!!source.lastUsedAngle && parsed.angle === source.lastUsedAngle);
+
+    if (collides) {
+      console.warn("[reel-cron] Apertura, sotto-argomento o angolo già usati di recente, rigenero");
+      const angleNote = source.lastUsedAngle && parsed.angle === source.lastUsedAngle
+        ? ` Hai anche scelto l'angolo "${parsed.angle}", identico all'ultima pubblicazione in assoluto — cambia angolo.`
+        : "";
+      const retryNote = `\nATTENZIONE: la tua prima bozza per questa richiesta iniziava con "${parsed.caption.split("\n")[0]}" e trattava il sotto-argomento "${parsed.subtopic ?? "n/d"}" — troppo simili (anche solo nel significato) a qualcosa già usato di recente.${angleNote} Riscrivi con un'apertura E una tesi centrale DAVVERO diverse nel significato, non solo nelle parole.\n`;
+      const retryParsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt, retryNote));
+      if (retryParsed) parsed = retryParsed;
+    }
+
+    await finalizeDraft(source, parsed);
+  } catch (e) {
+    console.error("[reel-cron] Errore imprevisto nella generazione", e);
+    await notifyFailure(`errore imprevisto: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
 
-  const history = await getRecentTopicHistory();
-  const subtopics = await getRecentSubtopicsByAngle();
-  const contentPrompt = buildContentPrompt(source, history.block, subtopics.block);
-
-  let parsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt));
-  if (!parsed) return;
-
-  const collides =
-    openingCollides(parsed.caption, history.recentCaptions) ||
-    subtopicCollides(parsed.subtopic, parsed.angle, subtopics.byAngle);
-
-  if (collides) {
-    console.warn("[reel-cron] Apertura o sotto-argomento già usati di recente, rigenero");
-    const retryNote = `\nATTENZIONE: la tua prima bozza per questa richiesta iniziava con "${parsed.caption.split("\n")[0]}" e trattava il sotto-argomento "${parsed.subtopic ?? "n/d"}" — entrambi già usati di recente. Riscrivi con un'apertura E una tesi centrale COMPLETAMENTE diverse, mai viste sopra.\n`;
-    const retryParsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt, retryNote));
-    if (retryParsed) parsed = retryParsed;
-  }
-
+async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
   const sanitize = (t: string) =>
     t.replace(/\bMaturazione\b/g, "Fermentazione").replace(/\bmaturazione\b/g, "fermentazione");
 
@@ -452,6 +500,7 @@ async function generateDraft() {
 
   if (error) {
     console.error("[reel-cron] Errore Supabase", error.message);
+    await notifyFailure(`errore salvataggio su Supabase: ${error.message}`);
     return;
   }
 
