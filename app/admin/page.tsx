@@ -650,6 +650,10 @@ setAuthenticated(true);
 
   const saveRecipe = async () => {
     if (!recipeForm.title.trim()) { setRecipeError("Il titolo è obbligatorio."); return; }
+    if (!editingRecipe && !recipeForm.collaborator_id) {
+      const confirmed = confirm('Nessun collaboratore selezionato: questa ricetta verrà considerata di Stefano Porro (usata anche come fonte per i post social). È corretto?');
+      if (!confirmed) return;
+    }
     setSavingRecipe(true);
     setRecipeError("");
 
@@ -804,6 +808,10 @@ setAuthenticated(true);
   // ── Save recipe to DB ────────────────────────────────────────────
   const saveRecipeToDB = async () => {
     if (!pdfForm.title.trim()) return;
+    if (pdfForm.creatore_id === "self") {
+      const confirmed = confirm('Creatore impostato su "Stefano Porro": questa ricetta verrà considerata tua e potrà essere usata come fonte per i post social. È corretto?');
+      if (!confirmed) return;
+    }
     setSavingToDB(true);
     await fetch("/api/recipes", {
       method: "POST",
@@ -816,6 +824,7 @@ setAuthenticated(true);
         file_url: "",
         active: false,
         sort_order: 99,
+        collaborator_id: pdfForm.creatore_id === "self" ? null : pdfForm.creatore_id,
       }),
     });
     setSavingToDB(false);
