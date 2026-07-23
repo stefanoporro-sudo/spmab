@@ -899,7 +899,7 @@ setAuthenticated(true);
             </div>
             {/* Tabs */}
             <div className="flex bg-dark-800 border border-dark-600 rounded-xl p-1 gap-1">
-              {(["iscritti", "ricette", "pdf", "blog", "social", "recensioni", "statistiche", "forum", "collaboratori"] as const).map((t) => (
+              {(["iscritti", "ricette", "collaboratori", "pdf", "blog", "social", "recensioni", "statistiche", "forum"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => { setTab(t); if (t === "statistiche" && !stats) fetchStats(); }}

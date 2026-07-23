@@ -9,6 +9,7 @@ const navLinks = [
   { href: "/#chi-sono", label: "Chi Sono" },
   { href: "/blog", label: "Blog" },
   { href: "/ricette", label: "Ricette" },
+  { href: "/collaboratori", label: "Collaboratori" },
   { href: "/consulenza-online", label: "Consulenza On Line" },
   { href: "/tecnico-formatore", label: "Formazione" },
   { href: "/community", label: "Community" },
