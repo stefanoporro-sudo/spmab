@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
-import { generateSocialCard } from "@/lib/social-image";
+import { generateSocialCoverImage } from "@/lib/social-image";
 
 export const maxDuration = 60;
 
@@ -174,7 +174,7 @@ async function pickSource(): Promise<SourceContent | null> {
   };
 }
 
-function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string; subtopic_is_similar_to_recent?: boolean } {
+function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; subtopic_is_similar_to_recent?: boolean } {
   const start = rawText.indexOf("{");
   if (start === -1) throw new Error("no {");
   let depth = 0;
@@ -325,7 +325,7 @@ Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero
 ${historyBlock}`;
 }
 
-type ParsedCaption = { caption: string; hashtags: string[]; angle: string; bullets?: string[]; subtopic?: string; subtopic_is_similar_to_recent?: boolean };
+type ParsedCaption = { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; subtopic_is_similar_to_recent?: boolean };
 
 async function callClaudeForCaption(anthropicKey: string, promptBody: string): Promise<ParsedCaption | null> {
   try {
@@ -374,14 +374,16 @@ REGOLE OBBLIGATORIE:
 - NON affermare mai che la fermentazione migliora la digeribilità della pizza: è falso
 - Se parli dell'approccio di Gabriele Bonci, resta sugli aspetti pubblicamente noti (alta idratazione, lunga lievitazione, tracciabilità delle farine, pizza al taglio gourmet popolare): non inventare mai citazioni dirette o dichiarazioni che non gli siano realmente attribuite
 
-Aggiungi anche 3-4 punti chiave brevissimi (massimo 6-7 parole ciascuno) che riassumano il messaggio centrale, da mettere in un'immagine di riepilogo.
+Aggiungi anche una breve frase ad effetto (4-8 parole, in italiano) da sovrimprimere sulla foto di copertina, e un prompt fotografico per generare quella foto — stessa logica delle copertine del blog: una foto realistica e pertinente, mai un grafico astratto, ma con tono più istituzionale/professionale (adatta a un pubblico B2B).
 
 Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
   "caption": "testo del post con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
   "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
-  "bullets": ["punto chiave 1", "punto chiave 2", "punto chiave 3"],
+  "image_headline": "frase breve ad effetto per la foto di copertina (4-8 parole)",
+  "image_prompt": "Cinematic [soggetto specifico legato al contenuto], warm amber light, Italian pizzeria or bakery, professional food photography, no text, no logos",
+  "unsplash_query": "2-3 English keywords",
   "subtopic": "breve descrizione del sotto-argomento/tesi scelto (3-6 parole)",
   "subtopic_is_similar_to_recent": false
 }`;
@@ -461,19 +463,22 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
 
   let imageUrl = "";
   try {
-    const bullets = (parsed.bullets ?? []).slice(0, 4).map(sanitize);
-    if (bullets.length) {
-      const buffer = await generateSocialCard("LinkedIn — Consulenza Pizzaiolo", bullets);
-      const fileName = `img-${Date.now()}-card.png`;
-      const { error: uploadErr } = await supabase.storage
-        .from("social")
-        .upload(fileName, buffer, { contentType: "image/png", upsert: false });
-      if (!uploadErr) {
-        const { data: urlData } = supabase.storage.from("social").getPublicUrl(fileName);
-        imageUrl = urlData.publicUrl;
-      } else {
-        console.error("[linkedin-cron] Errore upload immagine:", uploadErr.message);
-      }
+    const headline = sanitize(parsed.image_headline || parsed.caption.split("\n")[0].slice(0, 90));
+    const buffer = await generateSocialCoverImage({
+      badgeLabel: "LinkedIn",
+      headline,
+      imagePrompt: parsed.image_prompt,
+      unsplashQuery: parsed.unsplash_query,
+    });
+    const fileName = `img-${Date.now()}-cover.png`;
+    const { error: uploadErr } = await supabase.storage
+      .from("social")
+      .upload(fileName, buffer, { contentType: "image/png", upsert: false });
+    if (!uploadErr) {
+      const { data: urlData } = supabase.storage.from("social").getPublicUrl(fileName);
+      imageUrl = urlData.publicUrl;
+    } else {
+      console.error("[linkedin-cron] Errore upload immagine:", uploadErr.message);
     }
   } catch (e) {
     console.error("[linkedin-cron] Generazione immagine fallita:", e);
