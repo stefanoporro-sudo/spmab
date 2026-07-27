@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
 import { generateSocialCoverImage } from "@/lib/social-image";
+import { ANGLES, ANGLE_CATEGORIES, Angle, pickNextTopic, getLastUsedAngle } from "@/lib/social-topics";
 
 export const maxDuration = 60;
 
@@ -15,20 +16,6 @@ function isAuthorized(req: NextRequest): boolean {
   );
 }
 
-const ANGLES = ["tecnica", "ingredienti", "attrezzatura", "business", "storia", "gourmet", "miti", "faq", "avviare", "vita"] as const;
-type Angle = (typeof ANGLES)[number];
-
-const ANGLE_CATEGORIES = `1. tecnica — Tecnica e impasto (idratazione, biga e poolish, gestione della biga a lunga fermentazione, temperatura dell'acqua, il ruolo dell'acqua e la sua durezza/pH, cornicione, autolisi, lievito madre, fermentazione, errori di cottura, il ruolo del malto, staglio e puntatura, differenza tra impasto diretto e indiretto, errori nella gestione delle farciture pre/post cottura)
-2. ingredienti — Ingredienti e materie prime (il pomodoro giusto, stagionalità del pomodoro e alternative fuori stagione, la mozzarella e l'umidità, farine alternative, differenza tra farina 00, 0 e integrale nella resa, come leggere una scheda tecnica della farina (W, P/L), il ruolo dell'olio EVO, le sfide reali della pizza senza glutine, stagionalità)
-3. attrezzatura — Attrezzatura e ambiente di lavoro (scelta del forno, manutenzione ordinaria del forno, cella frigorifera, attrezzi del pizzaiolo, la pala)
-4. business — Business e gestione di una pizzeria già avviata (food cost, come calcolare il prezzo di una pizza dal food cost reale, il menù, marketing, recensioni online, il ruolo dei social nella scelta della pizzeria da parte del cliente, gestione del personale, gestione del rush del sabato sera, come formare un nuovo pizzaiolo assunto in due settimane, sostenibilità e sprechi in pizzeria)
-5. storia — Cultura e storia (storia del grano e delle farine, storia della pizza, differenze tra stili regionali italiani, la filosofia della lunga lievitazione e alta idratazione diffusa da Gabriele Bonci, l'eredità di Gabriele Bonci nel rendere la pizza al taglio romana un prodotto gourmet popolare)
-6. gourmet — Ricette gourmet (abbinamenti non convenzionali, contaminazioni con l'alta cucina, pizze gourmet stagionali, l'approccio alla pizza gourmet ma popolare in stile Gabriele Bonci, l'attenzione alla selezione e tracciabilità delle farine come nell'approccio di Bonci, il principio "meno ingredienti, più qualità" nella farcitura)
-7. miti — Miti e disinformazione sulla pizza (falsi miti generali, es. "il forno a legna è sempre meglio dell'elettrico", "la pizza gourmet è solo marketing")
-8. faq — Domande frequenti dei clienti (perché costa di più, tempi di attesa, opzioni senza glutine, come gestire allergie e intolleranze in menù, differenza tra pizza al piatto e pizza al taglio nella gestione del servizio, cosa chiedono spesso al banco)
-9. avviare — Aprire e avviare una pizzeria o un percorso di formazione tecnica (errori tipici dei primi mesi, business plan, scelte iniziali, storie generiche di aperture riuscite)
-10. vita — Vita da pizzaiolo/formatore (dietro le quinte, giornata tipo, aneddoti personali)`;
-
 type SourceContent = {
   sourceType: "post" | "recipe" | "standalone";
   sourceId: string | null;
@@ -37,48 +24,9 @@ type SourceContent = {
   usedAngles: Angle[];
   forcedAngle?: Angle;
   forcedSubtopic?: string;
+  forcedIngredient?: string;
   lastUsedAngle?: string | null;
 };
-
-const BONCI_SUBTOPICS = [
-  "la filosofia della lunga lievitazione e alta idratazione diffusa da Gabriele Bonci",
-  "l'eredità di Gabriele Bonci nel rendere la pizza al taglio romana un prodotto gourmet popolare",
-  "l'approccio alla pizza gourmet ma popolare in stile Gabriele Bonci",
-  "l'attenzione alla selezione e tracciabilità delle farine come nell'approccio di Bonci",
-  "il principio \"meno ingredienti, più qualità\" nella farcitura, in stile Bonci",
-];
-
-async function shouldForceBonci(): Promise<boolean> {
-  const { data } = await supabase
-    .from("social_posts")
-    .select("subtopic, caption")
-    .order("created_at", { ascending: false })
-    .limit(30);
-  return !(data ?? []).some(
-    (row) => (row.subtopic ?? "").toLowerCase().includes("bonci") || (row.caption ?? "").toLowerCase().includes("bonci")
-  );
-}
-
-async function pickLeastUsedAngle(avoid?: string | null): Promise<Angle> {
-  const { data } = await supabase.from("social_posts").select("angle");
-  const counts: Record<string, number> = Object.fromEntries(ANGLES.map((a) => [a, 0]));
-  for (const row of data ?? []) {
-    if (row.angle && counts[row.angle] !== undefined) counts[row.angle]++;
-  }
-  const min = Math.min(...ANGLES.map((a) => counts[a]));
-  let tied = ANGLES.filter((a) => counts[a] === min);
-  if (avoid && tied.length > 1) tied = tied.filter((a) => a !== avoid);
-  return tied[Math.floor(Math.random() * tied.length)];
-}
-
-async function getLastUsedAngle(): Promise<string | null> {
-  const { data } = await supabase
-    .from("social_posts")
-    .select("angle")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  return data?.[0]?.angle ?? null;
-}
 
 async function pickBestCandidate<T extends { id: string }>(
   candidates: T[],
@@ -133,12 +81,18 @@ async function pickSource(): Promise<SourceContent | null> {
 
   // 1 generazione su 3 pesca da blog/ricette (alternati), 2 su 3 sono contenuto standalone
   if (n % 3 !== 0) {
-    const angle = await pickLeastUsedAngle(lastUsedAngle);
-    let forcedSubtopic: string | undefined;
-    if ((angle === "storia" || angle === "gourmet") && (await shouldForceBonci())) {
-      forcedSubtopic = BONCI_SUBTOPICS[Math.floor(Math.random() * BONCI_SUBTOPICS.length)];
-    }
-    return { sourceType: "standalone", sourceId: null, title: "", summary: "", usedAngles: [], forcedAngle: angle, forcedSubtopic, lastUsedAngle };
+    const topic = await pickNextTopic();
+    return {
+      sourceType: "standalone",
+      sourceId: null,
+      title: "",
+      summary: "",
+      usedAngles: [],
+      forcedAngle: topic.angle,
+      forcedSubtopic: topic.topic,
+      forcedIngredient: topic.ingredient,
+      lastUsedAngle,
+    };
   }
 
   const useRecipe = Math.floor(n / 3) % 2 === 1;
@@ -177,7 +131,7 @@ async function pickSource(): Promise<SourceContent | null> {
   };
 }
 
-function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; subtopic_is_similar_to_recent?: boolean } {
+function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; subtopic_is_similar_to_recent?: boolean; suggested_recipe?: { title: string; category: string; level: string; description: string } } {
   const start = rawText.indexOf("{");
   if (start === -1) throw new Error("no {");
   let depth = 0;
@@ -292,19 +246,25 @@ Dichiara nel campo "subtopic" una frase breve (3-6 parole) che descriva lo speci
 ATTENZIONE — il confronto con i sotto-argomenti sopra deve essere sul SIGNIFICATO, non sulle parole usate: due tesi che raccontano la stessa idea di fondo con parole diverse (es. "differenze tra pizza napoletana e romana" e "origini degli stili regionali italiani" sono la STESSA tesi, solo riformulata) contano come ripetizione. Prima di rispondere, controlla onestamente se la tua tesi è concettualmente la stessa di una già elencata per questo angolo; imposta il campo "subtopic_is_similar_to_recent" a true se lo è (anche solo in parte), false se è davvero un'idea distinta.`;
 
   if (source.sourceType === "standalone") {
-    const forcedSubtopicBlock = source.forcedSubtopic
-      ? `\nSOTTO-ARGOMENTO GIÀ ASSEGNATO (obbligatorio, non sceglierne un altro): ${source.forcedSubtopic}. Scrivi la caption specificamente su questo tema — resta sugli aspetti pubblicamente noti, senza inventare citazioni dirette. Nel campo "subtopic" della risposta usa questa stessa frase (o una lieve riformulazione che la mantenga riconoscibile).\n`
+    const recipeSuggestionBlock = source.forcedIngredient
+      ? `\nQuesto argomento riguarda un ingrediente di pregio (${source.forcedIngredient}). Suggerisci ANCHE una ricetta di pizza, focaccia o pane che lo valorizzi, da aggiungere come bozza nel ricettario. Nel campo "suggested_recipe" della risposta:
+{
+  "title": "nome della ricetta",
+  "category": "Pizza|Focaccia|Pane|Altro",
+  "level": "Base|Intermedio|Avanzato",
+  "description": "elenco ingredienti con quantità indicative, poi il procedimento passo passo"
+}
+Ometti il campo "suggested_recipe" solo se l'ingrediente non si presta davvero a una ricetta pizza/pane/focaccia.\n`
       : "";
 
-    return `Scrivi una caption per un Reel Instagram/Facebook come contenuto originale (non parte da un articolo specifico del sito), sul seguente angolo:
+    return `Scrivi una caption per un Reel Instagram/Facebook come contenuto originale (non parte da un articolo specifico del sito).
 
-${ANGLE_CATEGORIES}
-
-Angolo da trattare: "${source.forcedAngle}" (usa esattamente questo valore nel campo "angle" della risposta).
-${forcedSubtopicBlock}
+ARGOMENTO GIÀ ASSEGNATO (obbligatorio, non sceglierne un altro): "${source.forcedSubtopic}"
+Angolo: "${source.forcedAngle}" (usa esattamente questo valore nel campo "angle" della risposta, e ripeti l'argomento assegnato nel campo "subtopic").
+${recipeSuggestionBlock}
 ${historyBlock}
 
-Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, se non sei sicuro di un dettaglio storico resta sul generico piuttosto che inventare date o nomi.`;
+Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, mai citazioni dirette non attribuibili con certezza; se non sei sicuro di un dettaglio storico o di una certificazione (DOP/IGP/presidio) resta sul generico piuttosto che inventare date, nomi o riconoscimenti.`;
   }
 
   const avoidBlock = `${source.usedAngles.length
@@ -319,16 +279,16 @@ Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un 
 Titolo: ${source.title}
 Sintesi: ${source.summary}
 
-Gli angoli possibili sono questi 6:
+Gli angoli possibili sono questi:
 ${ANGLE_CATEGORIES}
 
 ${avoidBlock}
-Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero) e dichiaralo nel campo "angle" della risposta con il suo codice (tecnica/ingredienti/attrezzatura/business/storia/gourmet/miti/faq/avviare/vita). Reinterpreta il contenuto del sito sotto quella lente, senza inventare fatti che non c'entrano con la fonte.
+Scegli un angolo NON ancora usato per questa fonte (se ce n'è almeno uno libero) e dichiaralo nel campo "angle" della risposta con il suo codice (${ANGLES.join("/")}). Reinterpreta il contenuto del sito sotto quella lente, senza inventare fatti che non c'entrano con la fonte.
 
 ${historyBlock}`;
 }
 
-type ParsedCaption = { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; subtopic_is_similar_to_recent?: boolean };
+type ParsedCaption = { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; subtopic_is_similar_to_recent?: boolean; suggested_recipe?: { title: string; category: string; level: string; description: string } };
 
 async function callClaudeForCaption(anthropicKey: string, promptBody: string): Promise<ParsedCaption | null> {
   try {
@@ -383,12 +343,13 @@ Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
   "caption": "testo della caption con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
-  "angle": "tecnica|ingredienti|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
+  "angle": "tecnica|ingredienti|panificazione|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
   "image_headline": "frase breve ad effetto per la foto di copertina (4-8 parole)",
   "image_prompt": "Cinematic [soggetto specifico legato al contenuto], warm amber light, Italian pizzeria or bakery, professional food photography, no text, no logos",
   "unsplash_query": "2-3 English keywords",
   "subtopic": "breve descrizione del sotto-argomento/tesi scelto (3-6 parole)",
-  "subtopic_is_similar_to_recent": false
+  "subtopic_is_similar_to_recent": false,
+  "suggested_recipe": "solo se richiesto esplicitamente sopra: { title, category, level, description }, altrimenti omettere il campo"
 }`;
 }
 
@@ -434,17 +395,19 @@ async function generateDraft() {
     }
 
     const collides =
-      openingCollides(parsed.caption, history.recentCaptions) ||
-      subtopicCollides(parsed.subtopic, parsed.angle, subtopics.byAngle) ||
-      parsed.subtopic_is_similar_to_recent === true ||
-      (!!source.lastUsedAngle && parsed.angle === source.lastUsedAngle);
+      source.sourceType === "standalone"
+        ? openingCollides(parsed.caption, history.recentCaptions)
+        : openingCollides(parsed.caption, history.recentCaptions) ||
+          subtopicCollides(parsed.subtopic, parsed.angle, subtopics.byAngle) ||
+          parsed.subtopic_is_similar_to_recent === true ||
+          (!!source.lastUsedAngle && parsed.angle === source.lastUsedAngle);
 
     if (collides) {
       console.warn("[reel-cron] Apertura, sotto-argomento o angolo già usati di recente, rigenero");
       const angleNote = source.lastUsedAngle && parsed.angle === source.lastUsedAngle
         ? ` Hai anche scelto l'angolo "${parsed.angle}", identico all'ultima pubblicazione in assoluto — cambia angolo.`
         : "";
-      const retryNote = `\nATTENZIONE: la tua prima bozza per questa richiesta iniziava con "${parsed.caption.split("\n")[0]}" e trattava il sotto-argomento "${parsed.subtopic ?? "n/d"}" — troppo simili (anche solo nel significato) a qualcosa già usato di recente.${angleNote} Riscrivi con un'apertura E una tesi centrale DAVVERO diverse nel significato, non solo nelle parole.\n`;
+      const retryNote = `\nATTENZIONE: la tua prima bozza per questa richiesta iniziava con "${parsed.caption.split("\n")[0]}" ${source.sourceType === "standalone" ? "" : `e trattava il sotto-argomento "${parsed.subtopic ?? "n/d"}" `}— troppo simile a qualcosa già usato di recente.${angleNote} Riscrivi con un'apertura DAVVERO diversa.\n`;
       const retryParsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt, retryNote));
       if (retryParsed) parsed = retryParsed;
     }
@@ -487,6 +450,8 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
     console.error("[reel-cron] Generazione immagine fallita:", e);
   }
 
+  const subtopicToSave = source.sourceType === "standalone" ? (source.forcedSubtopic ?? null) : (parsed.subtopic ?? null);
+
   const { data: draft, error } = await supabase
     .from("social_posts")
     .insert({
@@ -494,7 +459,7 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
       source_id: source.sourceId,
       content_type: "reel",
       angle,
-      subtopic: parsed.subtopic ?? null,
+      subtopic: subtopicToSave,
       caption,
       image_url: imageUrl,
       scheduled_slot: "19:00",
@@ -509,6 +474,29 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
     return;
   }
 
+  let suggestedRecipeTitle = "";
+  if (source.forcedIngredient && parsed.suggested_recipe) {
+    try {
+      const { error: recipeErr } = await supabase.from("recipes").insert({
+        title: parsed.suggested_recipe.title,
+        category: parsed.suggested_recipe.category || "Pizza",
+        level: parsed.suggested_recipe.level || "Intermedio",
+        description: parsed.suggested_recipe.description,
+        file_url: "",
+        active: false,
+        sort_order: 99,
+        collaborator_id: null,
+      });
+      if (recipeErr) {
+        console.error("[reel-cron] Errore salvataggio ricetta suggerita:", recipeErr.message);
+      } else {
+        suggestedRecipeTitle = parsed.suggested_recipe.title;
+      }
+    } catch (e) {
+      console.error("[reel-cron] Errore inserimento ricetta suggerita:", e);
+    }
+  }
+
   const adminUrl = `https://www.consulenzapizzaiolo.it/admin?tab=social&edit=${draft.id}`;
   const preview = caption.length > 300 ? `${caption.slice(0, 300)}…` : caption;
   const fonteLabel =
@@ -517,9 +505,12 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
   const imageNote = imageUrl
     ? "🖼️ Immagine generata automaticamente — sostituiscila nel pannello se preferisci un video/foto tua.\n\n"
     : "";
+  const recipeNote = suggestedRecipeTitle
+    ? `\n\n💡 Ricetta suggerita aggiunta come bozza in "Ricette": ${suggestedRecipeTitle}`
+    : "";
 
   await sendTelegramMessage(
-    `🎬 <b>Nuovo Reel da revisionare</b>\n\nFonte: ${fonteLabel}${source.title ? ` — ${source.title}` : ""} · angolo: ${angle ?? "n/d"}\n\n${imageNote}${preview}\n\n<a href="${adminUrl}">Apri nel pannello</a>`
+    `🎬 <b>Nuovo Reel da revisionare</b>\n\nFonte: ${fonteLabel}${source.title ? ` — ${source.title}` : ""} · angolo: ${angle ?? "n/d"}\n\n${imageNote}${preview}${recipeNote}\n\n<a href="${adminUrl}">Apri nel pannello</a>`
   );
 
   console.log(`[reel-cron] Bozza creata (${draft.id}) fonte=${source.sourceType}:${source.sourceId} angolo=${angle}`);
