@@ -104,15 +104,21 @@ type CoverOptions = {
 };
 
 // Immagine di copertina per post/Reel/LinkedIn, stessa identità visiva delle copertine blog:
-// foto reale (Stability AI, poi Unsplash come fallback gratuito) con overlay a gradiente, badge e
-// titolo; fallback grafico se nessuna delle due è disponibile.
+// 1) Unsplash con la query specifica di Claude (foto vera, priorità di Stefano)
+// 2) Stability AI come ripiego (foto generata dall'IA, solo se Unsplash specifico non trova nulla)
+// 3) Unsplash con una query generica ("italian pizza bakery") come ultimo tentativo di foto vera
+// 4) Grafico piatto, solo se anche il tentativo generico fallisce (dovrebbe essere rarissimo)
 export async function generateSocialCoverImage(opts: CoverOptions): Promise<Buffer> {
   let photoDataUrl: string | null = null;
-  if (opts.imagePrompt) {
+
+  if (opts.unsplashQuery) {
+    photoDataUrl = await fetchUnsplashImage(opts.unsplashQuery);
+  }
+  if (!photoDataUrl && opts.imagePrompt) {
     photoDataUrl = await fetchStabilityImage(opts.imagePrompt, "4:5");
   }
-  if (!photoDataUrl && opts.unsplashQuery) {
-    photoDataUrl = await fetchUnsplashImage(opts.unsplashQuery);
+  if (!photoDataUrl) {
+    photoDataUrl = await fetchUnsplashImage("italian pizza bakery");
   }
 
   const titleLen = opts.headline.length;
