@@ -1,5 +1,15 @@
 import { ImageResponse } from "next/og";
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchStabilityImage(prompt: string, aspectRatio: string): Promise<string | null> {
   const apiKey = process.env.STABILITY_API_KEY;
   if (!apiKey) {
@@ -25,16 +35,20 @@ export async function fetchStabilityImage(prompt: string, aspectRatio: string): 
 
     console.log("[social-image] Chiamata Stability AI, prompt:", prompt.slice(0, 80));
 
-    const res = await fetch("https://api.stability.ai/v2beta/stable-image/generate/core", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Accept: "image/*",
-        "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        "Content-Length": String(bodyBuf.length),
+    const res = await fetchWithTimeout(
+      "https://api.stability.ai/v2beta/stable-image/generate/core",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: "image/*",
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "Content-Length": String(bodyBuf.length),
+        },
+        body: bodyBuf,
       },
-      body: bodyBuf,
-    });
+      20000
+    );
 
     if (!res.ok) {
       const err = await res.text();
@@ -53,15 +67,16 @@ export async function fetchStabilityImage(prompt: string, aspectRatio: string): 
   }
 }
 
-// Fallback: foto reale da Unsplash
+// Fallback: foto reale da Unsplash (gratuito, ma stile/luce non controllabili)
 export async function fetchUnsplashImage(query: string): Promise<string | null> {
   const apiKey = process.env.UNSPLASH_ACCESS_KEY;
   if (!apiKey) return null;
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=portrait&content_filter=high&client_id=${apiKey}`,
-      { headers: { "Accept-Version": "v1" } }
+      { headers: { "Accept-Version": "v1" } },
+      10000
     );
     if (!res.ok) return null;
 
@@ -69,7 +84,7 @@ export async function fetchUnsplashImage(query: string): Promise<string | null> 
     const imgUrl = data.urls?.regular;
     if (!imgUrl) return null;
 
-    const photoRes = await fetch(imgUrl);
+    const photoRes = await fetchWithTimeout(imgUrl, {}, 10000);
     if (!photoRes.ok) return null;
 
     const mime = photoRes.headers.get("content-type") ?? "image/jpeg";
@@ -89,10 +104,10 @@ type CoverOptions = {
 };
 
 // Immagine di copertina per post/Reel/LinkedIn, stessa identità visiva delle copertine blog:
-// foto reale (Stability AI o Unsplash) con overlay a gradiente, badge e titolo; fallback grafico se non c'è foto.
+// foto reale (Stability AI, poi Unsplash come fallback gratuito) con overlay a gradiente, badge e
+// titolo; fallback grafico se nessuna delle due è disponibile.
 export async function generateSocialCoverImage(opts: CoverOptions): Promise<Buffer> {
   let photoDataUrl: string | null = null;
-
   if (opts.imagePrompt) {
     photoDataUrl = await fetchStabilityImage(opts.imagePrompt, "4:5");
   }
