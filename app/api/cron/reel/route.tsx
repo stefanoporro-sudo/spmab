@@ -131,7 +131,7 @@ Angolo: "${source.forcedAngle}" (usa esattamente questo valore nel campo "angle"
 ${recipeSuggestionBlock}
 ${history}
 
-IMPORTANTE: anche se l'argomento assegnato è diverso da quelli sopra, NON ritrattare la stessa tesi centrale con un taglio diverso. Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, mai citazioni dirette non attribuibili con certezza; se non sei sicuro di un dettaglio storico o di una certificazione (DOP/IGP/presidio) resta sul generico piuttosto che inventare date, nomi o riconoscimenti.`;
+IMPORTANTE: anche se l'argomento assegnato è diverso da quelli sopra, NON ritrattare la stessa tesi centrale con un taglio diverso. NON scrivere MAI frasi come "ne ho già parlato" o "su questo ho già scritto" a meno che quello specifico argomento non compaia letteralmente nella cronologia qui sopra — non dare per scontato che qualcosa sia già stato trattato solo perché è concettualmente vicino al tuo argomento assegnato: se non è nella lista sopra, per te è nuovo, trattalo come tale. Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, mai citazioni dirette non attribuibili con certezza; se non sei sicuro di un dettaglio storico o di una certificazione (DOP/IGP/presidio) resta sul generico piuttosto che inventare date, nomi o riconoscimenti.`;
 }
 
 type ParsedCaption = { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; suggested_recipe?: { title: string; category: string; level: string; description: string } };
