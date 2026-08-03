@@ -81,7 +81,9 @@ Le 11 categorie (`angle`): tecnica (impasto), ingredienti, **panificazione** (ar
 
 Ogni generazione riceve anche i titoli di **tutti** gli articoli blog pubblicati e l'apertura delle ultime 15 caption social/Reel già create — comprese quelle **rifiutate** da Stefano — con l'istruzione di non ritrattare lo stesso argomento specifico anche se l'angolo è diverso. Per questo motivo il bottone "Rifiuta" nel pannello admin non elimina più la riga (`status: rejected`, non una DELETE): la storia va preservata perché il sistema la usa per evitare di riproporre argomenti già scartati.
 
-⚠️ **`max_tokens` della chiamata a Claude** (1500 per post/LinkedIn, 1200 per Reel) deve restare abbondante: lo schema JSON di risposta è cresciuto nel tempo (angolo, sotto-argomento, autovalutazione, campi immagine, eventuale ricetta suggerita) — se la risposta viene troncata il JSON risulta incompleto e la generazione fallisce del tutto (visto succedere quando i campi sono stati aggiunti senza alzare il limite). Aumentare ulteriormente lo schema richiede di rivalutare anche questo valore.
+⚠️ **`max_tokens` della chiamata a Claude** (1500 per post/LinkedIn, 1200 per Reel) deve restare abbondante: lo schema JSON di risposta è cresciuto nel tempo (angolo, sotto-argomento, campi immagine, eventuale ricetta suggerita) — se la risposta viene troncata il JSON risulta incompleto e la generazione fallisce del tutto (visto succedere quando i campi sono stati aggiunti senza alzare il limite). Aumentare ulteriormente lo schema richiede di rivalutare anche questo valore.
+
+Se la prima chiamata a Claude fallisce (errore API, risposta vuota o JSON non valido — capita in modo transitorio, indipendente dal contenuto del prompt), i 3 cron **riprovano automaticamente una volta** prima di arrendersi e mandare la notifica di fallimento — dimezza gli avvisi "generazione fallita" dovuti a hiccup momentanei della chiamata, senza bisogno di intervento manuale.
 
 La chiamata a Unsplash in `lib/social-image.tsx` ha un timeout (10s) per non rischiare di far scadere l'intera funzione (`maxDuration: 60`) se il servizio è lento.
 

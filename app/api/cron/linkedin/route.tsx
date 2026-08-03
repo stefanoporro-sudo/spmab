@@ -217,7 +217,11 @@ async function generateDraft() {
 
     let parsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt));
     if (!parsed) {
-      await notifyFailure("Claude non ha risposto o la risposta non era in JSON valido (vedi log Vercel)");
+      console.warn("[linkedin-cron] Primo tentativo fallito, riprovo una volta");
+      parsed = await callClaudeForCaption(anthropicKey, buildFullPrompt(contentPrompt));
+    }
+    if (!parsed) {
+      await notifyFailure("Claude non ha risposto o la risposta non era in JSON valido, anche dopo un secondo tentativo (vedi log Vercel)");
       return;
     }
 
