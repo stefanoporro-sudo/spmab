@@ -6,18 +6,6 @@ export const ANGLES = [
 ] as const;
 export type Angle = (typeof ANGLES)[number];
 
-export const ANGLE_CATEGORIES = `1. tecnica — Tecnica e impasto (idratazione, fermentazione, biga e poolish, cornicione, cotture)
-2. ingredienti — Ingredienti e materie prime per pizza (farine, pomodoro, formaggi, condimenti)
-3. panificazione — Panificazione e arte bianca in generale (pane, focacce, grissini, lievitati dolci)
-4. attrezzatura — Attrezzatura e ambiente di lavoro (forni, celle, impastatrici, strumenti)
-5. business — Business e gestione di un'attività già avviata (food cost, menù, personale, marketing)
-6. storia — Cultura e storia (origini, stili regionali, prodotti tipici e la loro storia)
-7. gourmet — Ricette gourmet e abbinamenti (farciture, contaminazioni, materie prime di pregio)
-8. miti — Miti e disinformazione da sfatare
-9. faq — Domande frequenti dei clienti
-10. avviare — Aprire e avviare un'attività o un percorso di formazione tecnica
-11. vita — Vita da pizzaiolo/fornaio, dietro le quinte`;
-
 export type Topic = {
   id: number;
   angle: Angle;
@@ -46,14 +34,14 @@ export const TOPICS: Topic[] = [
   { id: 12, angle: "tecnica", topic: "Errori di cottura più comuni e come correggerli" },
   { id: 13, angle: "tecnica", topic: "Fermentazione a freddo: tempi e temperature ideali" },
   { id: 14, angle: "tecnica", topic: "Puntata lunga vs appretto lungo: cosa cambia nel prodotto finale" },
-  { id: 15, angle: "tecnica", topic: "Idratazione della farina in base al W: come calcolarla" },
+  { id: 15, angle: "tecnica", topic: "Perché due impasti con la stessa identica ricetta possono venire diversi" },
   { id: 16, angle: "tecnica", topic: "Gestione dell'impasto nei mesi caldi: correttivi pratici" },
   { id: 17, angle: "tecnica", topic: "Gestione dell'impasto nei mesi freddi: correttivi pratici" },
   { id: 18, angle: "tecnica", topic: "Stesura a mano vs al mattarello: differenze sul risultato" },
   { id: 19, angle: "tecnica", topic: "La prova del velo: come capire se l'impasto è pronto" },
   { id: 20, angle: "tecnica", topic: "Rinfreschi del lievito madre: frequenza e proporzioni" },
   { id: 21, angle: "tecnica", topic: "Impasto per pizza in teglia vs impasto per pizza tonda" },
-  { id: 22, angle: "tecnica", topic: "Come recuperare un impasto troppo idratato" },
+  { id: 22, angle: "tecnica", topic: "Come riconoscere un impasto sovralievitato prima di infornare" },
   { id: 23, angle: "tecnica", topic: "Come recuperare un impasto poco sviluppato" },
   { id: 24, angle: "tecnica", topic: "Il ruolo della maglia glutinica nella struttura della pizza" },
   { id: 25, angle: "tecnica", topic: "Doppia cottura per la pizza in teglia: perché funziona" },
@@ -101,7 +89,7 @@ export const TOPICS: Topic[] = [
   { id: 63, angle: "panificazione", topic: "Lievito di birra vs pasta madre: quando scegliere l'una o l'altro" },
   { id: 64, angle: "panificazione", topic: "Autolisi nel pane: stessa logica della pizza, risultati diversi" },
   { id: 65, angle: "panificazione", topic: "Grissini artigianali: tecnica e varianti" },
-  { id: 66, angle: "panificazione", topic: "Focaccia genovese: i segreti dell'idratazione alta" },
+  { id: 66, angle: "panificazione", topic: "Focaccia genovese: il ruolo della salamoia nella crosta" },
   { id: 67, angle: "panificazione", topic: "Taralli pugliesi: tradizione e tecnica" },
   { id: 68, angle: "panificazione", topic: "Pane in cassetta fatto in laboratorio di pizzeria" },
   { id: 69, angle: "panificazione", topic: "Diversificare il menù con prodotti da forno oltre la pizza" },
@@ -111,7 +99,7 @@ export const TOPICS: Topic[] = [
   { id: 73, angle: "panificazione", topic: "Conservazione del pane fatto in casa o in pizzeria: errori comuni" },
   { id: 74, angle: "panificazione", topic: "Il ruolo della farina di segale nei prodotti da forno" },
   { id: 75, angle: "panificazione", topic: "Pane con lievito madre solido vs licoli" },
-  { id: 76, angle: "panificazione", topic: "Idratazione nel pane: quanto conta rispetto alla pizza" },
+  { id: 76, angle: "panificazione", topic: "Doppia lievitazione nel pane vs singola nella pizza: perché cambia" },
   { id: 77, angle: "panificazione", topic: "La crosta perfetta: vapore e temperatura in cottura del pane" },
   { id: 78, angle: "panificazione", topic: "Pane integrale: bilanciare sapore e digeribilità" },
   { id: 79, angle: "panificazione", topic: "Ciabatta italiana: tecnica e alveolatura" },
@@ -354,15 +342,6 @@ export const TOPICS: Topic[] = [
   { id: 300, angle: "vita", topic: "Perché ogni pizza racconta qualcosa di chi la fa" },
 ];
 
-async function getLastUsedAngle(): Promise<string | null> {
-  const { data } = await supabase
-    .from("social_posts")
-    .select("angle")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  return data?.[0]?.angle ?? null;
-}
-
 // Sceglie l'argomento standalone da assegnare (rotazione forzata, non è una scelta di Claude):
 // prima quelli mai usati, poi quello usato meno di recente in assoluto. Il match è per
 // testo esatto dell'argomento (colonna social_posts.subtopic), garantendo un ciclo pieno
@@ -391,5 +370,3 @@ export async function pickNextTopic(): Promise<Topic> {
   });
   return sorted[0];
 }
-
-export { getLastUsedAngle };
