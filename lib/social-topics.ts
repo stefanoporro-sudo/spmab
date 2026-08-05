@@ -13,6 +13,13 @@ export type Topic = {
   /** Se presente, l'argomento riguarda un ingrediente di pregio: la generazione deve
    * suggerire anche una ricetta da salvare come bozza nel ricettario. */
   ingredient?: string;
+  /** Se presente, raggruppa argomenti che parlano dello stesso soggetto specifico sotto
+   * angoli diversi (es. "sale" per i 3 topic sul sale). Usato da pickNextTopic() per
+   * evitare che due argomenti della stessa famiglia escano a distanza ravvicinata, anche
+   * se il testo è diverso e quindi non verrebbe mai bloccato dal solo confronto esatto.
+   * Quando assente ma `ingredient` è presente, la famiglia è implicitamente il valore di
+   * `ingredient` (due topic sullo stesso ingrediente specifico sono la stessa famiglia). */
+  family?: string;
 };
 
 // 300 argomenti/microargomenti su pizza e arte bianca (pane incluso), pensati per la
@@ -49,7 +56,7 @@ export const TOPICS: Topic[] = [
   { id: 27, angle: "tecnica", topic: "Tempi di cottura ideali in base al tipo di forno" },
   { id: 28, angle: "tecnica", topic: "Come capire se un forno è davvero pronto per infornare" },
   { id: 29, angle: "tecnica", topic: "Farciture pre-cottura vs post-cottura: quando cambia il risultato" },
-  { id: 30, angle: "tecnica", topic: "Bilanciare sale e lievito nell'impasto: un equilibrio delicato" },
+  { id: 30, angle: "tecnica", topic: "Bilanciare sale e lievito nell'impasto: un equilibrio delicato", family: "sale" },
 
   // ── ingredienti (31-60) ────────────────────────────────────────────────
   { id: 31, angle: "ingredienti", topic: "Come leggere una scheda tecnica della farina (W, P/L)" },
@@ -61,9 +68,9 @@ export const TOPICS: Topic[] = [
   { id: 37, angle: "ingredienti", topic: "Farine alternative (kamut, farro, segale) in pizzeria" },
   { id: 38, angle: "ingredienti", topic: "Scegliere un olio EVO da usare a crudo" },
   { id: 39, angle: "ingredienti", topic: "Pizza senza glutine: le sfide tecniche reali" },
-  { id: 40, angle: "ingredienti", topic: "Il sale: tipologie e momento giusto di inserimento" },
+  { id: 40, angle: "ingredienti", topic: "Il sale: tipologie e momento giusto di inserimento", family: "sale" },
   { id: 41, angle: "ingredienti", topic: "Lievito di birra fresco vs secco: differenze pratiche" },
-  { id: 42, angle: "ingredienti", topic: "Semola rimacinata: quando usarla nell'impasto" },
+  { id: 42, angle: "ingredienti", topic: "Semola rimacinata: quando usarla nell'impasto", family: "semola-rimacinata" },
   { id: 43, angle: "ingredienti", topic: "Farine integrali: come bilanciarle senza appesantire l'impasto" },
   { id: 44, angle: "ingredienti", topic: "Grassi nell'impasto: quando aggiungerli e perché" },
   { id: 45, angle: "ingredienti", topic: "Zuccheri nell'impasto: funzione reale oltre il sapore" },
@@ -80,7 +87,7 @@ export const TOPICS: Topic[] = [
   { id: 56, angle: "ingredienti", topic: "La farina di Tumminia, grano antico siciliano: caratteristiche e uso in impasto", ingredient: "Farina di Tumminia" },
   { id: 57, angle: "ingredienti", topic: "Il Pecorino Romano DOP: quando esaltarlo su una pizza", ingredient: "Pecorino Romano DOP" },
   { id: 58, angle: "ingredienti", topic: "L'olio EVO Riviera Ligure DOP: profilo aromatico e uso a crudo", ingredient: "Olio EVO Riviera Ligure DOP" },
-  { id: 59, angle: "ingredienti", topic: "Il sale marino di Trapani: perché molti pizzaioli lo scelgono", ingredient: "Sale Marino di Trapani" },
+  { id: 59, angle: "ingredienti", topic: "Il sale marino di Trapani: perché molti pizzaioli lo scelgono", ingredient: "Sale Marino di Trapani", family: "sale" },
   { id: 60, angle: "ingredienti", topic: "Il grano Senatore Cappelli: un grano antico tornato di moda", ingredient: "Grano Senatore Cappelli" },
 
   // ── panificazione / arte bianca (61-95) ─────────────────────────────────
@@ -95,7 +102,7 @@ export const TOPICS: Topic[] = [
   { id: 69, angle: "panificazione", topic: "Diversificare il menù con prodotti da forno oltre la pizza" },
   { id: 70, angle: "panificazione", topic: "Panettone e colomba: perché sono un mondo tecnico a parte" },
   { id: 71, angle: "panificazione", topic: "Baguette in stile francese fatta da un pizzaiolo italiano" },
-  { id: 72, angle: "panificazione", topic: "Pane di semola rimacinata: caratteristiche e usi" },
+  { id: 72, angle: "panificazione", topic: "Pane di semola rimacinata: caratteristiche e usi", family: "semola-rimacinata" },
   { id: 73, angle: "panificazione", topic: "Conservazione del pane fatto in casa o in pizzeria: errori comuni" },
   { id: 74, angle: "panificazione", topic: "Il ruolo della farina di segale nei prodotti da forno" },
   { id: 75, angle: "panificazione", topic: "Pane con lievito madre solido vs licoli" },
@@ -342,10 +349,23 @@ export const TOPICS: Topic[] = [
   { id: 300, angle: "vita", topic: "Perché ogni pizza racconta qualcosa di chi la fa" },
 ];
 
+function getFamily(topic: Topic): string | undefined {
+  return topic.family ?? topic.ingredient;
+}
+
+// Due argomenti diversi possono comunque parlare dello stesso soggetto (es. "Il sale" e
+// "Il sale marino di Trapani"): la rotazione da sola non lo vede perché confronta solo il
+// testo esatto. Questo è il tempo minimo che deve passare da un argomento della stessa
+// famiglia prima che un altro membro della stessa famiglia possa uscire.
+const FAMILY_COOLDOWN_MS = 21 * 24 * 60 * 60 * 1000;
+
 // Sceglie l'argomento standalone da assegnare (rotazione forzata, non è una scelta di Claude):
-// prima quelli mai usati, poi quello usato meno di recente in assoluto. Il match è per
-// testo esatto dell'argomento (colonna social_posts.subtopic), garantendo un ciclo pieno
-// sui 300 argomenti prima di qualunque ripetizione.
+// prima quelli mai usati (con priorità a quelli la cui famiglia tematica non è "in
+// raffreddamento"), poi quello usato meno di recente in assoluto. Il match sul singolo
+// argomento è per testo esatto (colonna social_posts.subtopic), garantendo un ciclo pieno
+// sui 300 argomenti prima di qualunque ripetizione; il raffreddamento per famiglia previene
+// invece che due argomenti affini (stesso ingrediente o soggetto specifico, angolo diverso)
+// escano a distanza ravvicinata.
 export async function pickNextTopic(): Promise<Topic> {
   const { data } = await supabase
     .from("social_posts")
@@ -358,9 +378,32 @@ export async function pickNextTopic(): Promise<Topic> {
     if (!lastUsedAt.has(row.subtopic)) lastUsedAt.set(row.subtopic, row.created_at);
   }
 
+  const topicByText = new Map(TOPICS.map((t) => [t.topic, t]));
+  const familyLastUsedAt = new Map<string, string>();
+  for (const [subtopicText, createdAt] of lastUsedAt) {
+    const family = getFamily(topicByText.get(subtopicText) ?? ({} as Topic));
+    if (!family) continue;
+    const prev = familyLastUsedAt.get(family);
+    if (!prev || createdAt > prev) familyLastUsedAt.set(family, createdAt);
+  }
+
+  const now = Date.now();
+  const isFamilyCoolingDown = (topic: Topic) => {
+    const family = getFamily(topic);
+    if (!family) return false;
+    const last = familyLastUsedAt.get(family);
+    if (!last) return false;
+    return now - new Date(last).getTime() < FAMILY_COOLDOWN_MS;
+  };
+
   const neverUsed = TOPICS.filter((t) => !lastUsedAt.has(t.topic));
   if (neverUsed.length > 0) {
-    return neverUsed[Math.floor(Math.random() * neverUsed.length)];
+    const neverUsedFresh = neverUsed.filter((t) => !isFamilyCoolingDown(t));
+    // Se il raffreddamento per famiglia svuota il pool (capita solo con poche famiglie
+    // rimaste tutte "calde"), meglio ripiegare su un argomento mai usato comunque piuttosto
+    // che bloccare la generazione.
+    const pool = neverUsedFresh.length > 0 ? neverUsedFresh : neverUsed;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   const sorted = [...TOPICS].sort((a, b) => {
