@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   }
 
   const numPackages = parseInt(packages) || 1;
-  const pricePerPack = numPackages >= 2 ? 225 : 250;
+  const pricePerPack = numPackages >= 2 ? 179 : 199;
   const totalPrice = pricePerPack * numPackages;
   const discount = numPackages >= 2 ? "Sconto 10% applicato" : "";
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
         <tr><td style="padding:10px 8px;color:#888;font-size:13px;">Telefono</td><td style="padding:10px 8px;">${phone}</td></tr>
         ${company ? `<tr style="background:#f9f9f9;"><td style="padding:10px 8px;color:#888;font-size:13px;">Azienda</td><td style="padding:10px 8px;">${company}</td></tr>` : ""}
         ${piva ? `<tr><td style="padding:10px 8px;color:#888;font-size:13px;">P.IVA</td><td style="padding:10px 8px;">${piva}</td></tr>` : ""}
-        <tr style="background:#f9f9f9;"><td style="padding:10px 8px;color:#888;font-size:13px;">Pacchetti</td><td style="padding:10px 8px;font-weight:bold;">${numPackages} × 250€ ${discount ? `— <span style="color:#c8741e;">${discount}</span>` : ""}</td></tr>
+        <tr style="background:#f9f9f9;"><td style="padding:10px 8px;color:#888;font-size:13px;">Pacchetti</td><td style="padding:10px 8px;font-weight:bold;">${numPackages} × 199€ ${discount ? `— <span style="color:#c8741e;">${discount}</span>` : ""}</td></tr>
         <tr><td style="padding:10px 8px;color:#888;font-size:13px;">Totale</td><td style="padding:10px 8px;font-size:18px;font-weight:bold;color:#c8741e;">€${totalPrice}</td></tr>
       </table>
       <div style="margin-top:20px;background:#fff8f0;border-left:4px solid #c8741e;padding:16px;border-radius:0 8px 8px 0;">
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         <div style="font-weight:bold;color:#c8741e;margin-bottom:12px;">Riepilogo richiesta</div>
         <div style="font-size:14px;color:#555;line-height:2;">
           📦 Pacchetti richiesti: <strong>${numPackages}</strong><br/>
-          ⏱ Durata: <strong>${numPackages * 3} giorni × 3 ore</strong><br/>
+          ⏱ Durata: <strong>${numPackages} session${numPackages === 1 ? "e tecnica" : "i tecniche"} da 90 minuti${numPackages > 1 ? ", una per pacchetto" : ""}</strong><br/>
           💰 Totale: <strong style="color:#c8741e;">€${totalPrice}${numPackages >= 2 ? " (sconto 10% applicato)" : ""}</strong><br/>
           🎓 Attestato di merito: <strong>incluso</strong>
         </div>

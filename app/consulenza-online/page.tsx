@@ -7,7 +7,7 @@ import Footer from "@/components/Footer";
 
 const vantaggi = [
   { icon: Monitor, titolo: "100% Online", desc: "Sessioni live via video chiamata, comodamente da dove sei. Nessuno spostamento, massima flessibilità." },
-  { icon: Clock, titolo: "3 giorni × 3 ore", desc: "Ogni pacchetto include 3 sessioni da 3 ore ciascuna, concentrate sull'argomento che scegli tu." },
+  { icon: Clock, titolo: "Sessione da 90 minuti", desc: "Ogni pacchetto include una sessione tecnica di 90 minuti, concentrata sull'argomento che scegli tu." },
   { icon: Award, titolo: "Attestato di merito", desc: "Al termine di ogni pacchetto ricevi un attestato ufficiale sull'argomento studiato insieme." },
   { icon: Tag, titolo: "Sconto 10%", desc: "Acquistando 2 o più pacchetti ottieni uno sconto del 10% su ogni pacchetto aggiuntivo." },
 ];
@@ -42,7 +42,7 @@ export default function ConsulenzaOnlinePage() {
   });
 
   const numPackages = parseInt(form.packages) || 1;
-  const pricePerPack = numPackages >= 2 ? 225 : 250;
+  const pricePerPack = numPackages >= 2 ? 179 : 199;
   const totalPrice = pricePerPack * numPackages;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -135,14 +135,14 @@ export default function ConsulenzaOnlinePage() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="text-gray-400 text-xs uppercase tracking-widest mb-1">1 Pacchetto</div>
-                    <div className="text-white font-display text-4xl font-bold">€250</div>
+                    <div className="text-white font-display text-4xl font-bold">€199</div>
                   </div>
                   <div className="bg-brand-500/10 border border-brand-500/20 rounded-xl p-3">
                     <ChefHat className="text-brand-400 w-6 h-6" />
                   </div>
                 </div>
                 <ul className="flex flex-col gap-3 mb-6">
-                  {["3 sessioni da 3 ore ciascuna", "1 argomento a scelta", "Attestato di merito incluso", "Supporto via email tra le sessioni"].map((item) => (
+                  {["1 sessione tecnica da 90 minuti", "1 argomento a scelta", "Attestato di merito incluso", "Supporto via email tra le sessioni"].map((item) => (
                     <li key={item} className="flex items-center gap-2 text-gray-300 text-sm">
                       <CheckCircle size={15} className="text-brand-400 shrink-0" />
                       {item}
@@ -162,14 +162,14 @@ export default function ConsulenzaOnlinePage() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="text-brand-300 text-xs uppercase tracking-widest mb-1">2+ Pacchetti</div>
-                    <div className="text-white font-display text-4xl font-bold">€225<span className="text-lg font-normal text-gray-400">/cad.</span></div>
+                    <div className="text-white font-display text-4xl font-bold">€179<span className="text-lg font-normal text-gray-400">/cad.</span></div>
                   </div>
                   <div className="bg-brand-500/20 border border-brand-500/30 rounded-xl p-3">
                     <Users className="text-brand-300 w-6 h-6" />
                   </div>
                 </div>
                 <ul className="flex flex-col gap-3 mb-6">
-                  {["3 sessioni da 3 ore per ogni pacchetto", "Argomenti diversi a ogni pacchetto", "Attestato di merito per ogni argomento", "Sconto del 10% per pacchetto aggiuntivo", "Percorso formativo progressivo"].map((item) => (
+                  {["1 sessione tecnica da 90 minuti per ogni pacchetto", "Argomenti diversi a ogni pacchetto", "Attestato di merito per ogni argomento", "Sconto del 10% per pacchetto aggiuntivo", "Percorso formativo progressivo"].map((item) => (
                     <li key={item} className="flex items-center gap-2 text-gray-300 text-sm">
                       <CheckCircle size={15} className="text-brand-400 shrink-0" />
                       {item}
@@ -292,20 +292,20 @@ export default function ConsulenzaOnlinePage() {
                     <label className="block text-gray-400 text-xs uppercase tracking-wide mb-2">Numero di pacchetti *</label>
                     <select name="packages" value={form.packages} onChange={handleChange}
                       className="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500 transition-colors text-sm appearance-none cursor-pointer">
-                      <option value="1" className="bg-dark-700">1 pacchetto — €250</option>
-                      <option value="2" className="bg-dark-700">2 pacchetti — €450 (sconto 10%)</option>
-                      <option value="3" className="bg-dark-700">3 pacchetti — €675 (sconto 10%)</option>
-                      <option value="4" className="bg-dark-700">4 pacchetti — €900 (sconto 10%)</option>
-                      <option value="5" className="bg-dark-700">5 pacchetti — €1.125 (sconto 10%)</option>
+                      <option value="1" className="bg-dark-700">1 pacchetto — €199</option>
+                      <option value="2" className="bg-dark-700">2 pacchetti — €358 (sconto 10%)</option>
+                      <option value="3" className="bg-dark-700">3 pacchetti — €537 (sconto 10%)</option>
+                      <option value="4" className="bg-dark-700">4 pacchetti — €716 (sconto 10%)</option>
+                      <option value="5" className="bg-dark-700">5 pacchetti — €895 (sconto 10%)</option>
                     </select>
                     {/* Riepilogo prezzo */}
                     <div className="mt-3 bg-dark-700 border border-brand-500/20 rounded-xl px-4 py-3 flex items-center justify-between">
-                      <span className="text-gray-400 text-sm">{numPackages} pacchett{numPackages === 1 ? "o" : "i"} × {numPackages * 3} giorni × 3 ore</span>
+                      <span className="text-gray-400 text-sm">{numPackages} pacchett{numPackages === 1 ? "o" : "i"} × 1 sessione tecnica da 90 minuti</span>
                       <span className="text-brand-300 font-bold text-lg">€{totalPrice}</span>
                     </div>
                     {numPackages >= 2 && (
                       <p className="text-green-400 text-xs mt-2 flex items-center gap-1">
-                        <CheckCircle size={12} /> Sconto del 10% applicato — risparmi €{(25 * numPackages)} rispetto al prezzo pieno
+                        <CheckCircle size={12} /> Sconto del 10% applicato — risparmi €{(20 * numPackages)} rispetto al prezzo pieno
                       </p>
                     )}
                   </div>
