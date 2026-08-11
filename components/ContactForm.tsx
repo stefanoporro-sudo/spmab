@@ -105,7 +105,7 @@ export default function ContactForm() {
 
             {/* Guarantee box */}
             <div className="bg-gradient-to-br from-brand-600/15 to-brand-900/10 border border-brand-500/25 rounded-2xl p-6 mt-2">
-              <div className="text-brand-300 font-semibold mb-2">Prima consulenza gratuita</div>
+              <div className="text-brand-300 font-semibold mb-2">Analisi iniziale della tua attività</div>
               <p className="text-gray-400 text-sm leading-relaxed">
                 Nessun impegno. Parliamo del tuo progetto, valutiamo insieme le opportunità e solo
                 allora decidi come procedere.

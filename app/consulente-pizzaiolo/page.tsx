@@ -92,7 +92,7 @@ export default function ConsulentePizzaioloPage() {
               href="#contatti"
               className="inline-flex items-center gap-3 bg-brand-500 hover:bg-brand-400 text-white font-bold px-8 py-4 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-brand-500/30 text-base"
             >
-              Prima consulenza gratuita
+              Analisi iniziale della tua attività
               <ArrowRight size={18} />
             </a>
             <a

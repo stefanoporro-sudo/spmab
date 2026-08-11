@@ -51,7 +51,7 @@ export default function Header() {
         </a>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-4">
+        <nav className="hidden xl:flex items-center gap-4">
           {navLinks.map((link) => (
             <a
               key={link.href}
@@ -64,7 +64,7 @@ export default function Header() {
         </nav>
 
         {/* Salvati + CTA */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden xl:flex items-center gap-3">
           <Link
             href="/salvati"
             className="text-gray-400 hover:text-brand-300 transition-colors p-2 rounded-lg hover:bg-brand-500/10"
@@ -75,16 +75,16 @@ export default function Header() {
           </Link>
           <a
             href="#contatti"
-            className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-6 py-2.5 rounded-full text-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-500/30"
+            className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-semibold px-6 py-2.5 rounded-full text-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-500/30 whitespace-nowrap"
           >
-            Consulenza Gratuita
+            Analisi iniziale della tua attività
           </a>
         </div>
 
         {/* Mobile toggle */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="md:hidden text-gray-300 hover:text-white transition-colors"
+          className="xl:hidden text-gray-300 hover:text-white transition-colors"
           aria-label="Menu"
         >
           {menuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -93,7 +93,7 @@ export default function Header() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden bg-dark-800 border-t border-dark-600 px-6 py-6 flex flex-col gap-6">
+        <div className="xl:hidden bg-dark-800 border-t border-dark-600 px-6 py-6 flex flex-col gap-6">
           {navLinks.map((link) => (
             <a
               key={link.href}
@@ -109,7 +109,7 @@ export default function Header() {
             onClick={() => setMenuOpen(false)}
             className="btn-primary self-start text-sm px-6 py-3"
           >
-            Consulenza Gratuita
+            Analisi iniziale della tua attività
           </a>
         </div>
       )}

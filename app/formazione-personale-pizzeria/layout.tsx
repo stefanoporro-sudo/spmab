@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Formazione Personale Pizzeria | Meno dipendenza da una sola persona — Stefano Porro",
   description:
-    "Se manchi tu, la qualità crolla? Formo il tuo staff perché il prodotto sia costante anche senza di te in cucina. Prima consulenza gratuita.",
+    "Se manchi tu, la qualità crolla? Formo il tuo staff perché il prodotto sia costante anche senza di te in cucina. Analisi iniziale della tua attività.",
   keywords: [
     "formazione personale pizzeria",
     "formazione staff pizzeria",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Formazione Personale Pizzeria — Stefano Porro",
     description:
-      "Il locale dipende da una sola persona: se manca lui, la qualità crolla. Formo lo staff con un metodo replicabile da chiunque. Prima consulenza gratuita.",
+      "Il locale dipende da una sola persona: se manca lui, la qualità crolla. Formo lo staff con un metodo replicabile da chiunque. Analisi iniziale della tua attività.",
     url: "https://www.consulenzapizzaiolo.it/formazione-personale-pizzeria",
     type: "website",
     locale: "it_IT",

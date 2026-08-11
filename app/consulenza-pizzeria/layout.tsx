@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Consulenza Pizzeria | La tua pizzeria non rende come dovrebbe — Stefano Porro",
   description:
-    "La tua pizzeria è aperta ma i risultati non arrivano: tanto lavoro, margini bassi, nessuno a cui chiedere. Consulenza per pizzerie già avviate. Prima consulenza gratuita.",
+    "La tua pizzeria è aperta ma i risultati non arrivano: tanto lavoro, margini bassi, nessuno a cui chiedere. Consulenza per pizzerie già avviate. Analisi iniziale della tua attività.",
   keywords: [
     "consulenza pizzeria",
     "consulenza gestione pizzeria",
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Consulenza Pizzeria — Stefano Porro",
     description:
-      "La tua pizzeria è aperta ma non rende come dovrebbe? Analizzo cosa non funziona e costruiamo insieme un piano concreto. Prima consulenza gratuita.",
+      "La tua pizzeria è aperta ma non rende come dovrebbe? Analizzo cosa non funziona e costruiamo insieme un piano concreto. Analisi iniziale della tua attività.",
     url: "https://www.consulenzapizzaiolo.it/consulenza-pizzeria",
     type: "website",
     locale: "it_IT",

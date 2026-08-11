@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Consulenza per Pizzaioli | Migliora il tuo prodotto — Stefano Porro",
   description:
-    "Consulenza personalizzata per pizzaioli dipendenti e titolari. Miglioro il tuo impasto, studio le tue criticità e ti aiuto a trasformare la passione in successo. Prima consulenza gratuita.",
+    "Consulenza personalizzata per pizzaioli dipendenti e titolari. Miglioro il tuo impasto, studio le tue criticità e ti aiuto a trasformare la passione in successo. Analisi iniziale della tua attività.",
   keywords: [
     "consulenza pizzaiolo",
     "consulente pizzaiolo",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Consulenza per Pizzaioli — Stefano Porro",
     description:
-      "Miglioro il tuo prodotto e studio le tue criticità. Tutti i pizzaioli con cui ho lavorato hanno migliorato il loro prodotto. Prima consulenza gratuita.",
+      "Miglioro il tuo prodotto e studio le tue criticità. Tutti i pizzaioli con cui ho lavorato hanno migliorato il loro prodotto. Analisi iniziale della tua attività.",
     url: "https://www.consulenzapizzaiolo.it/consulenza-pizzaioli",
     type: "website",
     locale: "it_IT",
