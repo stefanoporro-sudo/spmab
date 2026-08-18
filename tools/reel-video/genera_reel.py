@@ -5,9 +5,12 @@
 Gira in locale (sul Mac, non su Vercel): legge da social_posts le bozze di
 Reel già scritte dal cron (/api/cron/reel, content_type='reel') a cui manca
 ancora il video, monta un video verticale a schede di testo con musica di
-sottofondo (nessuna voce, nessun volto), lo carica sul bucket Supabase
-'reels' e aggiorna la riga con video_url — pronta per la revisione/
-pubblicazione dal pannello /admin.
+sottofondo (nessuna voce, nessun volto). Ogni scheda mostra una FOTO VERA
+pertinente al suo testo (Unsplash, stessa priorità foto-vera-prima usata per
+le copertine social del sito) con il testo in overlay — stessi font/stile
+(Montserrat Bold, ombra, posizione) del pannello ~/video-editor-panel.
+Carica il video sul bucket Supabase 'reels' e aggiorna la riga con
+video_url — pronta per la revisione/pubblicazione dal pannello /admin.
 
 Uso:
   python3 genera_reel.py            # elabora tutte le bozze in attesa
@@ -15,6 +18,7 @@ Uso:
 """
 
 import argparse
+import base64
 import json
 import random
 import subprocess
@@ -31,12 +35,14 @@ import requests
 SCRIPT_DIR = Path(__file__).parent.resolve()
 REPO_ROOT = SCRIPT_DIR.parent.parent
 MUSIC_DIR = SCRIPT_DIR / "music"
+FONT_PATH = SCRIPT_DIR / "fonts" / "Montserrat-Bold.ttf"
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 W, H = 1080, 1920
 CARD_DURATION = 3.0
 FADE = 0.35
 BUCKET = "reels"
+BRAND_ORANGE = "#c8741e"
 
 
 def load_env(path: Path) -> dict:
@@ -48,13 +54,15 @@ def load_env(path: Path) -> dict:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, val = line.partition("=")
-        env[key.strip()] = val.strip()
+        env[key.strip()] = val.strip().strip('"').strip("'")
     return env
 
 
 ENV = load_env(REPO_ROOT / ".env.local")
 SUPABASE_URL = ENV.get("NEXT_PUBLIC_SUPABASE_URL")
 SERVICE_KEY = ENV.get("SUPABASE_SERVICE_ROLE_KEY")
+UNSPLASH_KEY = ENV.get("UNSPLASH_ACCESS_KEY")
+STABILITY_KEY = ENV.get("STABILITY_API_KEY")
 
 if not SUPABASE_URL or not SERVICE_KEY:
     sys.exit("❌ NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY mancanti in .env.local")
@@ -65,9 +73,11 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
+FONT_B64 = base64.b64encode(FONT_PATH.read_bytes()).decode() if FONT_PATH.exists() else None
+
 
 def esc(t: str) -> str:
-    return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
 def slugify(text: str) -> str:
@@ -103,80 +113,131 @@ def fetch_pending_reels(limit: int | None = None):
     return rows[:limit] if limit else rows
 
 
-def build_card_svg(text: str, index: int, total: int) -> str:
-    is_hook = index == 0
+# ─── Foto: stessa priorità delle copertine social del sito ──────────────────
+# (lib/social-image.tsx) Unsplash specifico -> Stability AI -> Unsplash generico
+# -> nessuna foto (fallback a scheda a sfondo piatto, gestito da build_card_html)
+
+def fetch_unsplash_photo(query: str) -> tuple[bytes, str] | None:
+    if not UNSPLASH_KEY:
+        return None
+    try:
+        res = requests.get(
+            "https://api.unsplash.com/photos/random",
+            params={"query": query, "orientation": "portrait", "content_filter": "high", "client_id": UNSPLASH_KEY},
+            headers={"Accept-Version": "v1"}, timeout=10,
+        )
+        if not res.ok:
+            return None
+        img_url = (res.json().get("urls") or {}).get("regular")
+        if not img_url:
+            return None
+        photo_res = requests.get(img_url, timeout=10)
+        if not photo_res.ok:
+            return None
+        return photo_res.content, photo_res.headers.get("content-type", "image/jpeg")
+    except requests.RequestException:
+        return None
+
+
+def fetch_stability_photo(prompt: str) -> tuple[bytes, str] | None:
+    if not STABILITY_KEY:
+        return None
+    try:
+        res = requests.post(
+            "https://api.stability.ai/v2beta/stable-image/generate/core",
+            headers={"Authorization": f"Bearer {STABILITY_KEY}", "Accept": "image/*"},
+            files={"prompt": (None, prompt), "aspect_ratio": (None, "9:16"), "output_format": (None, "jpeg")},
+            timeout=20,
+        )
+        if not res.ok:
+            return None
+        return res.content, res.headers.get("content-type", "image/jpeg")
+    except requests.RequestException:
+        return None
+
+
+def get_card_photo(unsplash_query: str) -> tuple[bytes, str] | None:
+    photo = fetch_unsplash_photo(unsplash_query) if unsplash_query else None
+    if photo:
+        return photo
+    prompt = f"Cinematic {unsplash_query}, warm amber light, Italian bakery, professional food photography, no text, no logos"
+    photo = fetch_stability_photo(prompt)
+    if photo:
+        return photo
+    return fetch_unsplash_photo("italian pizza bakery dough")
+
+
+def build_card_html(card_text: str, index: int, total: int, photo: tuple[bytes, str] | None) -> str:
     is_cta = index == total - 1
 
-    fs = 72
-    lines = wrap(text.upper() if is_hook else text, 15)
+    fs = 68
+    lines = wrap(card_text, 16)
     if len(lines) > 4:
-        lines = wrap(text, 20)
-        fs = 52
+        lines = wrap(card_text, 22)
+        fs = 48
     elif len(lines) == 4:
-        fs = 56
+        fs = 52
     elif len(lines) == 3:
-        fs = 64
+        fs = 60
     elif len(lines) == 1:
-        fs = 84
+        fs = 80
 
-    line_h = fs + 16
-    start_y = H // 2 - (len(lines) - 1) * line_h // 2
+    text_html = "<br/>".join(esc(ln) for ln in lines)
 
-    text_color = "#fff" if is_cta else ("url(#orange)" if is_hook else "#2b2b2b")
-    tspans = ""
-    for i, ln in enumerate(lines):
-        tspans += (
-            f'<text x="{W//2}" y="{start_y + i*line_h}" font-size="{fs}" '
-            f'fill="{text_color}" font-weight="900" text-anchor="middle" '
-            f'font-family="\'Arial Black\', Arial, sans-serif">{esc(ln)}</text>\n'
-        )
-
-    dots = ""
-    dot_total_w = total * 28
-    dot_start_x = W // 2 - dot_total_w // 2
-    for i in range(total):
-        filled = i <= index
-        color = "#c8741e" if filled else "#00000022"
-        dots += f'<circle cx="{dot_start_x + i*28 + 10}" cy="140" r="7" fill="{color}"/>'
-
-    card_bg = (
-        f'<rect width="{W}" height="{H}" fill="url(#orangebg)"/>' if is_cta
-        else f'<rect width="{W}" height="{H}" fill="url(#bg)"/>'
+    dots = "".join(
+        f'<span class="dot" style="background:{BRAND_ORANGE if i <= index else "rgba(255,255,255,0.35)"}"></span>'
+        for i in range(total)
     )
 
-    return f"""<svg width="{W}" height="{H}" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f7eede"/><stop offset="1" stop-color="#efe0c4"/>
-    </linearGradient>
-    <linearGradient id="orangebg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#e08a2b"/><stop offset="1" stop-color="#c8741e"/>
-    </linearGradient>
-    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#e08a2b"/><stop offset="1" stop-color="#c8741e"/>
-    </linearGradient>
-  </defs>
-  {card_bg}
-  <rect x="36" y="36" width="{W-72}" height="{H-72}" rx="28" fill="none" stroke="{'#ffffff88' if is_cta else '#c8741e'}" stroke-width="5" opacity="0.6"/>
-  {dots}
-  {tspans}
-  <g transform="translate({W//2 - 190},{H - 130})">
-    <rect x="0" y="0" width="380" height="60" rx="30" fill="{'#ffffff' if is_cta else '#2b2b2b'}"/>
-    <text x="190" y="39" font-size="26" fill="{'#c8741e' if is_cta else '#fff'}" font-family="Arial, sans-serif" font-weight="700" text-anchor="middle">consulenzapizzaiolo.it</text>
-  </g>
-</svg>"""
+    if photo:
+        photo_bytes, mime = photo
+        b64 = base64.b64encode(photo_bytes).decode()
+        background = f"background-image:url(data:{mime};base64,{b64}); background-size:cover; background-position:center;"
+    else:
+        # Nessuna foto disponibile (Unsplash/Stability entrambi falliti): sfondo piatto di riserva
+        background = "background:linear-gradient(160deg,#f7eede,#efe0c4);"
+
+    font_face = f"""@font-face {{
+        font-family: "Montserrat";
+        src: url(data:font/ttf;base64,{FONT_B64}) format("truetype");
+        font-weight: 700;
+      }}""" if FONT_B64 else ""
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><style>
+  {font_face}
+  * {{ box-sizing: border-box; margin:0; padding:0; }}
+  html,body {{ width:{W}px; height:{H}px; overflow:hidden; }}
+  .frame {{ width:{W}px; height:{H}px; position:relative; {background} font-family:'Montserrat', Arial, sans-serif; }}
+  .dots {{ position:absolute; top:56px; left:0; right:0; display:flex; justify-content:center; gap:12px; z-index:3; }}
+  .dot {{ width:12px; height:12px; border-radius:50%; }}
+  .gradient {{ position:absolute; inset:0; background:linear-gradient(to bottom, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.18) 38%, rgba(0,0,0,0.72) 68%, rgba(0,0,0,0.90) 100%); display:flex; flex-direction:column; justify-content:flex-end; padding:0 68px 150px; }}
+  .text {{ color:#fff; font-weight:700; font-size:{fs}px; line-height:1.22; text-align:center; text-shadow:0 2px 8px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.5); }}
+  .brand {{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:30px; }}
+  .brand .bar {{ width:5px; height:24px; background:{BRAND_ORANGE}; border-radius:3px; }}
+  .brand .label {{ color:rgba(255,255,255,0.62); font-size:20px; letter-spacing:1.2px; font-weight:700; }}
+</style></head>
+<body>
+  <div class="frame">
+    <div class="dots">{dots}</div>
+    <div class="gradient">
+      <div class="text">{text_html}</div>
+      <div class="brand"><div class="bar"></div><div class="label">consulenzapizzaiolo.it{" · segui" if is_cta else ""}</div></div>
+    </div>
+  </div>
+</body></html>"""
 
 
-def render_png(svg: str, out_path: Path):
-    svg_path = out_path.with_suffix(".svg")
-    svg_path.write_text(svg, encoding="utf-8")
+def render_png(html: str, out_path: Path):
+    html_path = out_path.with_suffix(".html")
+    html_path.write_text(html, encoding="utf-8")
     subprocess.run(
         [CHROME, "--headless", "--disable-gpu", "--no-sandbox",
          f"--screenshot={out_path}", f"--window-size={W},{H}",
-         "--default-background-color=ffffffff", str(svg_path)],
+         "--default-background-color=ffffffff", str(html_path)],
         capture_output=True, check=True,
     )
-    svg_path.unlink(missing_ok=True)
+    html_path.unlink(missing_ok=True)
     if not out_path.exists():
         raise RuntimeError(f"Chrome non ha prodotto {out_path}")
 
@@ -278,9 +339,14 @@ def process_reel(row: dict):
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         pngs = []
-        for i, card_text in enumerate(cards):
+        for i, card in enumerate(cards):
+            query = card.get("unsplash_query", "")
+            print(f"  📷 Foto scheda {i+1}/{len(cards)} ({query or 'nessuna query'})...")
+            photo = get_card_photo(query)
+            if not photo:
+                print(f"     ⚠️  Nessuna foto trovata per '{query}', uso sfondo di riserva")
             png_path = tmp / f"card{i}.png"
-            render_png(build_card_svg(card_text, i, len(cards)), png_path)
+            render_png(build_card_html(card["text"], i, len(cards), photo), png_path)
             pngs.append(png_path)
 
         out_mp4 = tmp / "reel.mp4"

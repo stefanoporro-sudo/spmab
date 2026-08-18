@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
-import { generateSocialCoverImage } from "@/lib/social-image";
 import { REEL_ANGLES, ReelAngle, pickNextReelTopic } from "@/lib/reel-topics";
 
 export const maxDuration = 60;
@@ -32,7 +31,9 @@ async function pickSource(): Promise<SourceContent> {
   };
 }
 
-function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; cards: string[]; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string } {
+type RawCard = { text: string; unsplash_query: string };
+
+function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; cards: RawCard[]; subtopic?: string } {
   const start = rawText.indexOf("{");
   if (start === -1) throw new Error("no {");
   let depth = 0;
@@ -131,7 +132,7 @@ ${history}
 IMPORTANTE: anche se l'argomento assegnato è diverso da quelli sopra, NON ritrattare la stessa tesi centrale con un taglio diverso. NON scrivere MAI frasi come "ne ho già parlato" o "su questo ho già scritto" a meno che quello specifico argomento non compaia letteralmente nella cronologia qui sopra. Mai inventare fatti falsi, mai citazioni dirette non attribuibili con certezza; se non sei sicuro di un dettaglio storico resta sul generico piuttosto che inventare date o nomi.`;
 }
 
-type ParsedCaption = { caption: string; hashtags: string[]; angle: string; cards: string[]; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string };
+type ParsedCaption = { caption: string; hashtags: string[]; angle: string; cards: RawCard[]; subtopic?: string };
 
 async function callClaudeForCaption(anthropicKey: string, promptBody: string): Promise<ParsedCaption | null> {
   try {
@@ -173,10 +174,12 @@ function buildFullPrompt(contentPrompt: string, retryNote?: string): string {
 
 ${contentPrompt}
 ${retryNote ?? ""}
-Il video è generato in automatico: schede di testo che scorrono sopra a immagini di sfondo, con una musica di sottofondo, nessuna voce e nessuna persona in video. Scrivi 3-5 schede ("cards"), in italiano, in questo ordine:
+Il video è generato in automatico: ogni scheda di testo appare sopra a una FOTO VERA pertinente a quello che dice quella scheda (mai un'illustrazione o un grafico), con una musica di sottofondo, nessuna voce e nessuna persona in video. Scrivi 3-5 schede ("cards"), in italiano, in questo ordine:
 1. Prima scheda = il gancio vero e proprio, chi scorre deve fermarsi in 1-2 secondi (domanda diretta, affermazione che rompe un luogo comune, o "non fare X finché non leggi questo")
 2-4. Sviluppo: il contenuto pratico dell'argomento assegnato, una frase breve per scheda (max 12 parole ciascuna, leggibile in 2-3 secondi)
 Ultima scheda = invito a seguire l'account per altri consigli di arte bianca (variare la formulazione, mai identica al reel precedente)
+
+Per OGNI scheda, oltre al testo, scrivi anche "unsplash_query": 2-3 parole chiave in INGLESE per una foto Unsplash che illustri VERAMENTE quello che dice quella scheda specifica (es. una scheda su "impasto che non lievita in ambiente freddo" → "cold dough rising"; una scheda sul cornicione → "pizza crust closeup"). Foto realistiche di cibo/panificazione/pizzeria, mai persone riconoscibili, mai testo o loghi nella foto.
 
 Tono onesto e diretto, senza fuffa da corsi costosi. Poi scrivi anche una caption estesa (80-150 parole) per il post Instagram sotto al video — questa può ampliare quanto detto nelle card, con CTA finale verso consulenzapizzaiolo.it. 5-8 hashtag pertinenti al mondo pizza/panificazione.
 
@@ -184,17 +187,16 @@ REGOLE OBBLIGATORIE:
 - Usa sempre "fermentazione" al posto di "maturazione" (parola vietata)
 - NON affermare mai che la fermentazione migliora la digeribilità: è falso
 
-Aggiungi anche una breve frase ad effetto (4-8 parole, in italiano) e un prompt fotografico per una foto di sfondo — stessa logica delle copertine del blog: una foto realistica e pertinente, mai un grafico astratto.
-
 Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
-  "cards": ["scheda 1 (il gancio)", "scheda 2", "scheda 3", "scheda 4 (facoltativa)", "scheda finale con invito a seguire"],
+  "cards": [
+    {"text": "scheda 1 (il gancio)", "unsplash_query": "2-3 English keywords"},
+    {"text": "scheda 2", "unsplash_query": "2-3 English keywords"},
+    {"text": "scheda finale con invito a seguire", "unsplash_query": "2-3 English keywords"}
+  ],
   "caption": "testo della caption estesa per il post, con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
   "angle": "miti|errori|tecnica|curiosita|confronti",
-  "image_headline": "frase breve ad effetto (4-8 parole)",
-  "image_prompt": "Cinematic [soggetto specifico legato al contenuto], warm amber light, Italian bakery, professional food photography, no text, no logos",
-  "unsplash_query": "2-3 English keywords",
   "subtopic": "ripeti esattamente il gancio assegnato sopra"
 }`;
 }
@@ -249,32 +251,12 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
 
   const hashtagsLine = parsed.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
   const caption = `${sanitize(parsed.caption)}\n\n${hashtagsLine}`;
-  const cards = (parsed.cards ?? []).map(sanitize);
+  const cards = (parsed.cards ?? []).map((c) => ({ text: sanitize(c.text), unsplash_query: c.unsplash_query }));
   const angle = REEL_ANGLES.includes(parsed.angle as ReelAngle) ? parsed.angle : (source.forcedAngle ?? null);
 
-  let imageUrl = "";
-  try {
-    const headline = sanitize(parsed.image_headline || parsed.caption.split("\n")[0].slice(0, 90));
-    const buffer = await generateSocialCoverImage({
-      badgeLabel: "Reel",
-      headline,
-      imagePrompt: parsed.image_prompt,
-      unsplashQuery: parsed.unsplash_query,
-    });
-    const fileName = `img-${Date.now()}-cover.png`;
-    const { error: uploadErr } = await supabase.storage
-      .from("social")
-      .upload(fileName, buffer, { contentType: "image/png", upsert: false });
-    if (!uploadErr) {
-      const { data: urlData } = supabase.storage.from("social").getPublicUrl(fileName);
-      imageUrl = urlData.publicUrl;
-    } else {
-      console.error("[reel-cron] Errore upload immagine:", uploadErr.message);
-    }
-  } catch (e) {
-    console.error("[reel-cron] Generazione immagine fallita:", e);
-  }
-
+  // Niente copertina statica generata qui: ogni scheda avrà la sua foto, scaricata e composta
+  // con il testo dallo script locale di montaggio (tools/reel-video/genera_reel.py), che gira
+  // sul Mac perché usa ffmpeg e Chrome headless non disponibili nell'ambiente Vercel.
   const { data: draft, error } = await supabase
     .from("social_posts")
     .insert({
@@ -286,7 +268,7 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
       caption,
       reel_cards: cards,
       video_url: null,
-      image_url: imageUrl,
+      image_url: "",
       scheduled_slot: "19:00",
       status: "draft",
     })
@@ -300,7 +282,7 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
   }
 
   const adminUrl = `https://www.consulenzapizzaiolo.it/admin?tab=social&edit=${draft.id}`;
-  const cardsPreview = cards.map((c, i) => `<li>${c}</li>`).join("");
+  const cardsPreview = cards.map((c) => `<li>${c.text}</li>`).join("");
 
   await sendReelEmail(
     `Nuovo Reel da revisionare — ${angle ?? "n/d"}`,

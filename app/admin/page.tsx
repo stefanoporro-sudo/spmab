@@ -26,7 +26,7 @@ type SocialPost = {
   content_type: "post" | "reel" | "linkedin";
   angle: string | null;
   caption: string; image_url: string; scheduled_slot: string;
-  reel_cards: string[] | null; video_url: string | null;
+  reel_cards: { text: string; unsplash_query: string }[] | null; video_url: string | null;
   status: "draft" | "approved" | "publishing" | "published" | "failed" | "rejected";
   platforms: string[];
   ig_result: Record<string, unknown> | null; fb_result: Record<string, unknown> | null;
@@ -1482,7 +1482,7 @@ setAuthenticated(true);
 
                       {p.content_type === "reel" && p.reel_cards && p.reel_cards.length > 0 && (
                         <ol className="text-gray-400 text-xs list-decimal list-inside space-y-0.5 bg-dark-700/50 rounded-lg px-3 py-2">
-                          {p.reel_cards.map((card, i) => <li key={i}>{card}</li>)}
+                          {p.reel_cards.map((card, i) => <li key={i}>{card.text}</li>)}
                         </ol>
                       )}
 
