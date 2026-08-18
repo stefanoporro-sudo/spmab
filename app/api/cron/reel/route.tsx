@@ -287,7 +287,7 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
       reel_cards: cards,
       video_url: null,
       image_url: imageUrl,
-      scheduled_slot: "daily",
+      scheduled_slot: "19:00",
       status: "draft",
     })
     .select()
