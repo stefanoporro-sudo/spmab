@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { waitUntil } from "@vercel/functions";
 import { generateSocialCoverImage } from "@/lib/social-image";
-import { ANGLES, Angle, pickNextTopic } from "@/lib/social-topics";
+import { REEL_ANGLES, ReelAngle, pickNextReelTopic } from "@/lib/reel-topics";
 
 export const maxDuration = 60;
 
@@ -17,25 +17,22 @@ function isAuthorized(req: NextRequest): boolean {
 }
 
 type SourceContent = {
-  forcedAngle: Angle;
+  forcedAngle: ReelAngle;
   forcedSubtopic: string;
-  forcedIngredient?: string;
 };
 
-// Ogni generazione è contenuto originale, con argomento assegnato dalla rotazione forzata
-// sui 300 argomenti (mai dallo stesso pool di blog/ricette, rimosso per evitare le ripetizioni
-// che causava: Claude, lasciato libero di reinterpretare una fonte, gravitava sempre sugli
-// stessi 3-4 temi "sicuri" — es. l'idratazione — indipendentemente dalla fonte).
+// Argomento assegnato dalla rotazione forzata sulla lista dedicata ai Reel arte bianca
+// (lib/reel-topics.ts) — separata dai 300 argomenti condivisi con post/LinkedIn, così i due
+// pool non si influenzano e i reel restano un flusso di contenuto a sé.
 async function pickSource(): Promise<SourceContent> {
-  const topic = await pickNextTopic();
+  const topic = await pickNextReelTopic();
   return {
     forcedAngle: topic.angle,
     forcedSubtopic: topic.topic,
-    forcedIngredient: topic.ingredient,
   };
 }
 
-function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; suggested_recipe?: { title: string; category: string; level: string; description: string } } {
+function extractJson(rawText: string): { caption: string; hashtags: string[]; angle: string; cards: string[]; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string } {
   const start = rawText.indexOf("{");
   if (start === -1) throw new Error("no {");
   let depth = 0;
@@ -55,18 +52,29 @@ function extractJson(rawText: string): { caption: string; hashtags: string[]; an
   return JSON.parse(rawText.slice(start, end + 1));
 }
 
-async function sendTelegramMessage(text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) {
-    console.error("[reel-cron] TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID mancanti");
+async function sendReelEmail(subject: string, html: string) {
+  const resendKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
+  if (!resendKey) {
+    console.error("[reel-cron] RESEND_API_KEY mancante");
     return;
   }
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const emailRes = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `Reel Consulenza Pizzaiolo <${fromEmail}>`,
+      to: ["porroste80@gmail.com"],
+      subject,
+      html,
+    }),
   });
+  if (!emailRes.ok) {
+    console.error("[reel-cron] Errore invio email:", await emailRes.text());
+  }
 }
 
 async function getRecentTopicHistory(): Promise<{ block: string; recentCaptions: string[] }> {
@@ -113,28 +121,17 @@ function openingCollides(caption: string, recentCaptions: string[]): boolean {
 }
 
 function buildContentPrompt(source: SourceContent, history: string): string {
-  const recipeSuggestionBlock = source.forcedIngredient
-    ? `\nQuesto argomento riguarda un ingrediente di pregio (${source.forcedIngredient}). Suggerisci ANCHE una ricetta di pizza, focaccia o pane che lo valorizzi, da aggiungere come bozza nel ricettario. Nel campo "suggested_recipe" della risposta:
-{
-  "title": "nome della ricetta",
-  "category": "Pizza|Focaccia|Pane|Altro",
-  "level": "Base|Intermedio|Avanzato",
-  "description": "elenco ingredienti con quantità indicative, poi il procedimento passo passo"
-}
-Ometti il campo "suggested_recipe" solo se l'ingrediente non si presta davvero a una ricetta pizza/pane/focaccia.\n`
-    : "";
+  return `Scrivi un Reel Instagram "arte bianca" a schede di testo (nessuna voce narrante, nessuna persona in video): una sequenza di frasi brevi che scorrono a schermo su uno sfondo, pensato per far seguire l'account a chi guarda, non solo per farlo scorrere.
 
-  return `Scrivi una caption per un Reel Instagram/Facebook come contenuto originale.
+GANCIO GIÀ ASSEGNATO (obbligatorio, non cambiarlo): "${source.forcedSubtopic}"
+Angolo: "${source.forcedAngle}" (usa esattamente questo valore nel campo "angle" della risposta, e ripeti il gancio assegnato nel campo "subtopic").
 
-ARGOMENTO GIÀ ASSEGNATO (obbligatorio, non sceglierne un altro): "${source.forcedSubtopic}"
-Angolo: "${source.forcedAngle}" (usa esattamente questo valore nel campo "angle" della risposta, e ripeti l'argomento assegnato nel campo "subtopic").
-${recipeSuggestionBlock}
 ${history}
 
-IMPORTANTE: anche se l'argomento assegnato è diverso da quelli sopra, NON ritrattare la stessa tesi centrale con un taglio diverso. NON scrivere MAI frasi come "ne ho già parlato" o "su questo ho già scritto" a meno che quello specifico argomento non compaia letteralmente nella cronologia qui sopra — non dare per scontato che qualcosa sia già stato trattato solo perché è concettualmente vicino al tuo argomento assegnato: se non è nella lista sopra, per te è nuovo, trattalo come tale. Scrivi un aneddoto storico verificabile, uno sfatamento di un mito comune, o un tip pratico su questo tema — mai inventare fatti falsi, mai citazioni dirette non attribuibili con certezza; se non sei sicuro di un dettaglio storico o di una certificazione (DOP/IGP/presidio) resta sul generico piuttosto che inventare date, nomi o riconoscimenti.`;
+IMPORTANTE: anche se l'argomento assegnato è diverso da quelli sopra, NON ritrattare la stessa tesi centrale con un taglio diverso. NON scrivere MAI frasi come "ne ho già parlato" o "su questo ho già scritto" a meno che quello specifico argomento non compaia letteralmente nella cronologia qui sopra. Mai inventare fatti falsi, mai citazioni dirette non attribuibili con certezza; se non sei sicuro di un dettaglio storico resta sul generico piuttosto che inventare date o nomi.`;
 }
 
-type ParsedCaption = { caption: string; hashtags: string[]; angle: string; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string; suggested_recipe?: { title: string; category: string; level: string; description: string } };
+type ParsedCaption = { caption: string; hashtags: string[]; angle: string; cards: string[]; image_headline?: string; image_prompt?: string; unsplash_query?: string; subtopic?: string };
 
 async function callClaudeForCaption(anthropicKey: string, promptBody: string): Promise<ParsedCaption | null> {
   try {
@@ -176,30 +173,37 @@ function buildFullPrompt(contentPrompt: string, retryNote?: string): string {
 
 ${contentPrompt}
 ${retryNote ?? ""}
-A differenza di un post normale, un Reel si guarda in video: le prime parole della caption devono funzionare da "gancio" che trattiene chi sta guardando (una domanda diretta, un'affermazione che rompe un luogo comune, o un "non fare X finché non guardi questo"). Testo breve, 80-150 parole, in italiano, tono onesto e diretto senza fuffa da corsi costosi. CTA finale verso consulenzapizzaiolo.it o l'invito a seguire Stefano. 5-8 hashtag pertinenti al mondo pizza/ristorazione.
+Il video è generato in automatico: schede di testo che scorrono sopra a immagini di sfondo, con una musica di sottofondo, nessuna voce e nessuna persona in video. Scrivi 3-5 schede ("cards"), in italiano, in questo ordine:
+1. Prima scheda = il gancio vero e proprio, chi scorre deve fermarsi in 1-2 secondi (domanda diretta, affermazione che rompe un luogo comune, o "non fare X finché non leggi questo")
+2-4. Sviluppo: il contenuto pratico dell'argomento assegnato, una frase breve per scheda (max 12 parole ciascuna, leggibile in 2-3 secondi)
+Ultima scheda = invito a seguire l'account per altri consigli di arte bianca (variare la formulazione, mai identica al reel precedente)
+
+Tono onesto e diretto, senza fuffa da corsi costosi. Poi scrivi anche una caption estesa (80-150 parole) per il post Instagram sotto al video — questa può ampliare quanto detto nelle card, con CTA finale verso consulenzapizzaiolo.it. 5-8 hashtag pertinenti al mondo pizza/panificazione.
 
 REGOLE OBBLIGATORIE:
 - Usa sempre "fermentazione" al posto di "maturazione" (parola vietata)
-- NON affermare mai che la fermentazione migliora la digeribilità della pizza: è falso
-- Se parli dell'approccio di Gabriele Bonci, resta sugli aspetti pubblicamente noti (alta idratazione, lunga lievitazione, tracciabilità delle farine, pizza al taglio gourmet popolare): non inventare mai citazioni dirette o dichiarazioni che non gli siano realmente attribuite
+- NON affermare mai che la fermentazione migliora la digeribilità: è falso
 
-Aggiungi anche una breve frase ad effetto (4-8 parole, in italiano) da sovrimprimere sulla foto di copertina, e un prompt fotografico per generare quella foto — stessa logica delle copertine del blog: una foto realistica e pertinente, mai un grafico astratto.
+Aggiungi anche una breve frase ad effetto (4-8 parole, in italiano) e un prompt fotografico per una foto di sfondo — stessa logica delle copertine del blog: una foto realistica e pertinente, mai un grafico astratto.
 
 Rispondi SOLO con questo JSON (nessun testo prima o dopo, nessun \`\`\`json):
 {
-  "caption": "testo della caption con eventuali a capo",
+  "cards": ["scheda 1 (il gancio)", "scheda 2", "scheda 3", "scheda 4 (facoltativa)", "scheda finale con invito a seguire"],
+  "caption": "testo della caption estesa per il post, con eventuali a capo",
   "hashtags": ["hashtag1", "hashtag2"],
-  "angle": "tecnica|ingredienti|panificazione|attrezzatura|business|storia|gourmet|miti|faq|avviare|vita",
-  "image_headline": "frase breve ad effetto per la foto di copertina (4-8 parole)",
-  "image_prompt": "Cinematic [soggetto specifico legato al contenuto], warm amber light, Italian pizzeria or bakery, professional food photography, no text, no logos",
+  "angle": "miti|errori|tecnica|curiosita|confronti",
+  "image_headline": "frase breve ad effetto (4-8 parole)",
+  "image_prompt": "Cinematic [soggetto specifico legato al contenuto], warm amber light, Italian bakery, professional food photography, no text, no logos",
   "unsplash_query": "2-3 English keywords",
-  "subtopic": "breve descrizione del sotto-argomento/tesi scelto (3-6 parole)",
-  "suggested_recipe": "solo se richiesto esplicitamente sopra: { title, category, level, description }, altrimenti omettere il campo"
+  "subtopic": "ripeti esattamente il gancio assegnato sopra"
 }`;
 }
 
 async function notifyFailure(reason: string) {
-  await sendTelegramMessage(`⚠️ <b>Generazione Reel fallita</b>\n\nMotivo: ${reason}\n\nNessuna bozza è stata creata.`);
+  await sendReelEmail(
+    "⚠️ Generazione Reel fallita",
+    `<p><strong>Generazione Reel fallita</strong></p><p>Motivo: ${reason}</p><p>Nessuna bozza è stata creata.</p>`
+  );
 }
 
 async function generateDraft() {
@@ -245,7 +249,8 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
 
   const hashtagsLine = parsed.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
   const caption = `${sanitize(parsed.caption)}\n\n${hashtagsLine}`;
-  const angle = ANGLES.includes(parsed.angle as Angle) ? parsed.angle : (source.forcedAngle ?? null);
+  const cards = (parsed.cards ?? []).map(sanitize);
+  const angle = REEL_ANGLES.includes(parsed.angle as ReelAngle) ? parsed.angle : (source.forcedAngle ?? null);
 
   let imageUrl = "";
   try {
@@ -279,8 +284,10 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
       angle,
       subtopic: source.forcedSubtopic,
       caption,
+      reel_cards: cards,
+      video_url: null,
       image_url: imageUrl,
-      scheduled_slot: "19:00",
+      scheduled_slot: "daily",
       status: "draft",
     })
     .select()
@@ -292,41 +299,15 @@ async function finalizeDraft(source: SourceContent, parsed: ParsedCaption) {
     return;
   }
 
-  let suggestedRecipeTitle = "";
-  if (source.forcedIngredient && parsed.suggested_recipe) {
-    try {
-      const { error: recipeErr } = await supabase.from("recipes").insert({
-        title: parsed.suggested_recipe.title,
-        category: parsed.suggested_recipe.category || "Pizza",
-        level: parsed.suggested_recipe.level || "Intermedio",
-        description: parsed.suggested_recipe.description,
-        file_url: "",
-        active: false,
-        sort_order: 99,
-        collaborator_id: null,
-      });
-      if (recipeErr) {
-        console.error("[reel-cron] Errore salvataggio ricetta suggerita:", recipeErr.message);
-      } else {
-        suggestedRecipeTitle = parsed.suggested_recipe.title;
-      }
-    } catch (e) {
-      console.error("[reel-cron] Errore inserimento ricetta suggerita:", e);
-    }
-  }
-
   const adminUrl = `https://www.consulenzapizzaiolo.it/admin?tab=social&edit=${draft.id}`;
-  const preview = caption.length > 300 ? `${caption.slice(0, 300)}…` : caption;
+  const cardsPreview = cards.map((c, i) => `<li>${c}</li>`).join("");
 
-  const imageNote = imageUrl
-    ? "🖼️ Immagine generata automaticamente — sostituiscila nel pannello se preferisci un video/foto tua.\n\n"
-    : "";
-  const recipeNote = suggestedRecipeTitle
-    ? `\n\n💡 Ricetta suggerita aggiunta come bozza in "Ricette": ${suggestedRecipeTitle}`
-    : "";
-
-  await sendTelegramMessage(
-    `🎬 <b>Nuovo Reel da revisionare</b>\n\nContenuto originale · angolo: ${angle ?? "n/d"}\n\n${imageNote}${preview}${recipeNote}\n\n<a href="${adminUrl}">Apri nel pannello</a>`
+  await sendReelEmail(
+    `Nuovo Reel da revisionare — ${angle ?? "n/d"}`,
+    `<p><strong>Nuovo Reel da revisionare</strong> — angolo: ${angle ?? "n/d"}</p>
+     <ol>${cardsPreview}</ol>
+     <p>⏳ Video in coda per il montaggio locale sul Mac — torna tra poco nel pannello per rivederlo prima di pubblicare.</p>
+     <p><a href="${adminUrl}">Apri nel pannello</a></p>`
   );
 
   console.log(`[reel-cron] Bozza creata (${draft.id}) angolo=${angle}`);

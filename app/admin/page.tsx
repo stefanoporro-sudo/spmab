@@ -26,6 +26,7 @@ type SocialPost = {
   content_type: "post" | "reel" | "linkedin";
   angle: string | null;
   caption: string; image_url: string; scheduled_slot: string;
+  reel_cards: string[] | null; video_url: string | null;
   status: "draft" | "approved" | "publishing" | "published" | "failed" | "rejected";
   platforms: string[];
   ig_result: Record<string, unknown> | null; fb_result: Record<string, unknown> | null;
@@ -152,7 +153,6 @@ export default function AdminPage() {
   const [socialError, setSocialError] = useState("");
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState("");
-  const [copiedSocialId, setCopiedSocialId] = useState<string | null>(null);
   // Apertura diretta di un post social via link email (/admin?tab=social&edit=ID)
   const [pendingSocialEditId, setPendingSocialEditId] = useState<string | null>(null);
 
@@ -346,12 +346,6 @@ setAuthenticated(true);
     setRegeneratingSocialId(null);
     if (!res.ok) setSocialError(data.error ?? "Errore nella rigenerazione.");
     fetchSocialPosts();
-  };
-
-  const copySocialCaption = async (id: string, caption: string) => {
-    await navigator.clipboard.writeText(caption);
-    setCopiedSocialId(id);
-    setTimeout(() => setCopiedSocialId((cur) => (cur === id ? null : cur)), 2000);
   };
 
   // ── Delete PDF ───────────────────────────────────────────────────
@@ -1438,7 +1432,19 @@ setAuthenticated(true);
                         </span>
                       </div>
 
-                      {p.image_url ? (
+                      {p.content_type === "reel" ? (
+                        p.video_url ? (
+                          <div className="rounded-xl overflow-hidden border border-dark-500">
+                            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                            <video src={p.video_url} controls className="w-full max-h-96 bg-black" />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2 bg-dark-700 border border-dashed border-dark-400 rounded-xl px-4 py-6">
+                            <Loader2 size={16} className="animate-spin text-gray-500" />
+                            <span className="text-gray-400 text-sm">Video in montaggio sul Mac — ricarica la pagina tra poco</span>
+                          </div>
+                        )
+                      ) : p.image_url ? (
                         <div className="relative rounded-xl overflow-hidden border border-dark-500 group">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={p.image_url} alt="Immagine post" className="w-full h-48 object-cover" />
@@ -1472,6 +1478,12 @@ setAuthenticated(true);
                             onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadSocialImage(p.id, file); e.target.value = ""; }}
                           />
                         </label>
+                      )}
+
+                      {p.content_type === "reel" && p.reel_cards && p.reel_cards.length > 0 && (
+                        <ol className="text-gray-400 text-xs list-decimal list-inside space-y-0.5 bg-dark-700/50 rounded-lg px-3 py-2">
+                          {p.reel_cards.map((card, i) => <li key={i}>{card}</li>)}
+                        </ol>
                       )}
 
                       {editingCaptionId === p.id ? (
@@ -1512,53 +1524,37 @@ setAuthenticated(true);
                           </button>
                         )}
 
-                        {p.content_type === "reel" ? (
-                          <>
-                            {p.status !== "published" && (
-                              <button
-                                onClick={() => copySocialCaption(p.id, p.caption)}
-                                className="border border-dark-500 text-gray-300 hover:text-white hover:border-brand-500 rounded-lg px-3 py-1.5 text-xs transition-colors"
-                              >
-                                {copiedSocialId === p.id ? "Copiato!" : "Copia caption"}
-                              </button>
-                            )}
-                            {(p.status === "draft" || p.status === "rejected") && (
-                              <button
-                                onClick={() => updateSocialPost(p.id, { status: "published" })}
-                                disabled={savingSocialId === p.id}
-                                className="bg-brand-500 hover:bg-brand-400 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-                              >
-                                <Check size={12} className="inline mr-1" /> Segna come pubblicato
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {(p.status === "draft" || p.status === "rejected") && (
-                              <button
-                                onClick={() => updateSocialPost(p.id, { status: "approved" })}
-                                disabled={!p.image_url || savingSocialId === p.id}
-                                className="bg-green-600 hover:bg-green-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
-                                title={!p.image_url ? "Carica prima un'immagine" : undefined}
-                              >
-                                <Check size={12} className="inline mr-1" /> Approva
-                              </button>
-                            )}
+                        {(() => {
+                          const mediaReady = p.content_type === "reel" ? !!p.video_url : !!p.image_url;
+                          const mediaMissingLabel = p.content_type === "reel" ? "Attendi che il video sia pronto" : "Carica prima un'immagine";
+                          return (
+                            <>
+                              {(p.status === "draft" || p.status === "rejected") && (
+                                <button
+                                  onClick={() => updateSocialPost(p.id, { status: "approved" })}
+                                  disabled={!mediaReady || savingSocialId === p.id}
+                                  className="bg-green-600 hover:bg-green-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
+                                  title={!mediaReady ? mediaMissingLabel : undefined}
+                                >
+                                  <Check size={12} className="inline mr-1" /> Approva
+                                </button>
+                              )}
 
-                            {(p.status === "approved" || p.status === "failed") && (
-                              <button
-                                onClick={() => publishSocialPost(p.id)}
-                                disabled={publishingSocialId === p.id}
-                                className="bg-brand-500 hover:bg-brand-400 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-                              >
-                                {publishingSocialId === p.id
-                                  ? <Loader2 size={12} className="inline animate-spin mr-1" />
-                                  : <Send size={12} className="inline mr-1" />}
-                                {p.status === "failed" ? "Riprova pubblicazione" : "Pubblica ora"}
-                              </button>
-                            )}
-                          </>
-                        )}
+                              {(p.status === "approved" || p.status === "failed") && (
+                                <button
+                                  onClick={() => publishSocialPost(p.id)}
+                                  disabled={publishingSocialId === p.id}
+                                  className="bg-brand-500 hover:bg-brand-400 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                                >
+                                  {publishingSocialId === p.id
+                                    ? <Loader2 size={12} className="inline animate-spin mr-1" />
+                                    : <Send size={12} className="inline mr-1" />}
+                                  {p.status === "failed" ? "Riprova pubblicazione" : "Pubblica ora"}
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
 
                         {p.status !== "published" && p.status !== "rejected" && (
                           <button

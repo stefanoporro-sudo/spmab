@@ -3,6 +3,11 @@ import { supabase } from "@/lib/supabase";
 
 const GRAPH_VERSION = "v21.0";
 
+// L'elaborazione di un video (Reel) da parte di Instagram richiede più tempo di
+// un'immagine: il polling di stato per i Reel usa un timeout più lungo (vedi
+// waitForContainerReady), quindi la funzione stessa deve poter girare più a lungo.
+export const maxDuration = 300;
+
 function isAdmin(req: NextRequest) {
   return req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
 }
@@ -32,8 +37,11 @@ function classifyMetaError(step: string, raw: { error?: { code?: number; message
   return new MetaApiError(step, "other", raw, raw?.error?.message ?? "Errore Meta API sconosciuto");
 }
 
-async function waitForContainerReady(creationId: string, token: string) {
-  for (let attempt = 0; attempt < 5; attempt++) {
+async function waitForContainerReady(creationId: string, token: string, opts?: { maxAttempts?: number; intervalMs?: number; mediaLabel?: string }) {
+  const maxAttempts = opts?.maxAttempts ?? 5;
+  const intervalMs = opts?.intervalMs ?? 2000;
+  const mediaLabel = opts?.mediaLabel ?? "Immagine";
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const res = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/${creationId}?fields=status_code&access_token=${token}`
     );
@@ -43,9 +51,9 @@ async function waitForContainerReady(creationId: string, token: string) {
     if (data.status_code === "ERROR") {
       throw new MetaApiError("ig_status_check", "other", data, "Instagram ha segnalato un errore nell'elaborazione del media");
     }
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, intervalMs));
   }
-  throw new MetaApiError("ig_status_check", "timeout", null, "Immagine non ancora processata da Instagram, riprova tra 1-2 minuti");
+  throw new MetaApiError("ig_status_check", "timeout", null, `${mediaLabel} non ancora processata da Instagram, riprova tra 1-2 minuti`);
 }
 
 async function publishToInstagram(imageUrl: string, caption: string) {
@@ -62,6 +70,34 @@ async function publishToInstagram(imageUrl: string, caption: string) {
   if (!createRes.ok) throw classifyMetaError("ig_create", createData);
 
   await waitForContainerReady(createData.id, token);
+
+  const publishRes = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${igUserId}/media_publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ creation_id: createData.id, access_token: token }),
+  });
+  const publishData = await publishRes.json();
+  if (!publishRes.ok) throw classifyMetaError("ig_publish", publishData);
+
+  return publishData;
+}
+
+async function publishReelToInstagram(videoUrl: string, caption: string) {
+  const igUserId = process.env.META_IG_USER_ID;
+  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  if (!igUserId || !token) throw new MetaApiError("ig_config", "other", null, "META_IG_USER_ID o META_PAGE_ACCESS_TOKEN mancanti");
+
+  const createRes = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${igUserId}/media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ media_type: "REELS", video_url: videoUrl, caption, access_token: token }),
+  });
+  const createData = await createRes.json();
+  if (!createRes.ok) throw classifyMetaError("ig_create", createData);
+
+  // I video richiedono molto più tempo di un'immagine per essere elaborati da Instagram
+  // prima che il container passi a FINISHED: fino a ~4 minuti per un Reel di 20-30 secondi.
+  await waitForContainerReady(createData.id, token, { maxAttempts: 40, intervalMs: 5000, mediaLabel: "Video" });
 
   const publishRes = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${igUserId}/media_publish`, {
     method: "POST",
@@ -206,11 +242,40 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (fetchError || !post) {
     return NextResponse.json({ error: "Post non trovato" }, { status: 404 });
   }
-  if (!post.image_url) {
+  if (post.content_type === "reel") {
+    if (!post.video_url) {
+      return NextResponse.json({ error: "Il video non è ancora pronto — attendi il montaggio locale o ricontrolla tra poco" }, { status: 400 });
+    }
+  } else if (!post.image_url) {
     return NextResponse.json({ error: "Carica un'immagine prima di pubblicare" }, { status: 400 });
   }
 
   const dryRun = process.env.SOCIAL_DRY_RUN === "true";
+
+  if (post.content_type === "reel") {
+    if (dryRun) {
+      await supabase.from("social_posts").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id);
+      return NextResponse.json({ instagram: { success: true, data: { id: "dry-run-reel" } }, status: "published" });
+    }
+    try {
+      const data = await publishReelToInstagram(post.video_url, post.caption);
+      await supabase
+        .from("social_posts")
+        .update({ status: "published", published_at: new Date().toISOString(), error_message: null })
+        .eq("id", id);
+      return NextResponse.json({ instagram: { success: true, data }, status: "published" });
+    } catch (e) {
+      const err = e instanceof MetaApiError ? e : new MetaApiError("reel_publish", "other", null, String(e));
+      await supabase.from("social_posts").update({ status: "failed", error_message: err.message }).eq("id", id);
+      if (err.kind === "token") {
+        await sendUrgentEmail(
+          "Token Meta scaduto",
+          "La pubblicazione del Reel è fallita per token scaduto. Rigeneralo da developers.facebook.com e aggiorna META_PAGE_ACCESS_TOKEN su Vercel."
+        );
+      }
+      return NextResponse.json({ instagram: { success: false, error: err.message }, status: "failed" }, { status: 500 });
+    }
+  }
 
   if (post.content_type === "linkedin") {
     if (dryRun) {
