@@ -149,12 +149,15 @@ export default function AdminPage() {
   const [uploadingSocialId, setUploadingSocialId] = useState<string | null>(null);
   const [publishingSocialId, setPublishingSocialId] = useState<string | null>(null);
   const [deletingSocialId, setDeletingSocialId] = useState<string | null>(null);
+  const [hardDeletingSocialId, setHardDeletingSocialId] = useState<string | null>(null);
   const [regeneratingSocialId, setRegeneratingSocialId] = useState<string | null>(null);
+  const [socialTypeFilter, setSocialTypeFilter] = useState<"all" | "reel" | "post" | "linkedin">("all");
   const [socialError, setSocialError] = useState("");
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState("");
   // Apertura diretta di un post social via link email (/admin?tab=social&edit=ID)
   const [pendingSocialEditId, setPendingSocialEditId] = useState<string | null>(null);
+  const filteredSocialPosts = socialTypeFilter === "all" ? socialPosts : socialPosts.filter((p) => p.content_type === socialTypeFilter);
 
   // ── Testimonials state ───────────────────────────────────────────
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -336,6 +339,14 @@ setAuthenticated(true);
     setDeletingSocialId(id);
     await updateSocialPost(id, { status: "rejected" });
     setDeletingSocialId(null);
+  };
+
+  const deleteSocialPost = async (id: string) => {
+    if (!confirm("Eliminare definitivamente questa bozza? A differenza di \"Rifiuta\", non si può annullare e l'argomento potrà ripresentarsi in futuro.")) return;
+    setHardDeletingSocialId(id);
+    await fetch(`/api/social/${id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+    setHardDeletingSocialId(null);
+    fetchSocialPosts();
   };
 
   const regenerateSocialTopic = async (id: string) => {
@@ -1387,19 +1398,42 @@ setAuthenticated(true);
               </button>
             </div>
 
+            <div className="flex gap-2 mb-6">
+              {([
+                ["all", "Tutti"],
+                ["reel", "🎬 Reel"],
+                ["post", "🖼️ Post"],
+                ["linkedin", "💼 LinkedIn"],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setSocialTypeFilter(value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    socialTypeFilter === value
+                      ? "bg-brand-500 text-white"
+                      : "bg-dark-700 text-gray-400 hover:text-white border border-dark-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {socialError && (
               <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-3">{socialError}</div>
             )}
 
             {socialLoading ? (
               <div className="flex justify-center py-20"><Loader2 className="text-brand-400 w-7 h-7 animate-spin" /></div>
-            ) : socialPosts.length === 0 ? (
+            ) : filteredSocialPosts.length === 0 ? (
               <div className="px-6 py-16 text-center text-gray-600 text-sm bg-dark-800 border border-dark-600 rounded-2xl">
-                Nessun post social ancora. Le bozze arrivano automaticamente 3 volte al giorno.
+                {socialTypeFilter === "all"
+                  ? "Nessun post social ancora. Le bozze arrivano automaticamente."
+                  : "Nessun elemento in questa categoria."}
               </div>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
-                {socialPosts.map((p) => {
+                {filteredSocialPosts.map((p) => {
                   const highlighted = pendingSocialEditId === p.id;
                   return (
                     <div
@@ -1579,6 +1613,15 @@ setAuthenticated(true);
                             {deletingSocialId === p.id ? <Loader2 size={12} className="inline animate-spin" /> : "Rifiuta"}
                           </button>
                         )}
+
+                        <button
+                          onClick={() => deleteSocialPost(p.id)}
+                          disabled={hardDeletingSocialId === p.id}
+                          title="Elimina definitivamente (rimuove anche il video/immagine caricati)"
+                          className="border border-dark-500 text-gray-500 hover:text-red-400 hover:border-red-500/40 rounded-lg px-2 py-1.5 text-xs transition-colors disabled:opacity-50"
+                        >
+                          {hardDeletingSocialId === p.id ? <Loader2 size={12} className="inline animate-spin" /> : <Trash2 size={12} />}
+                        </button>
                       </div>
                     </div>
                   );
