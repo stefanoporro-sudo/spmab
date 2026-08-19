@@ -8,3 +8,6 @@ node_modules/
 .vercel
 .env*
 !.env.local.example
+tools/reel-video/music/.rotation.json
+__pycache__/
+*.pyc

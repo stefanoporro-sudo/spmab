@@ -117,18 +117,45 @@ def fetch_pending_reels(limit: int | None = None):
 # (lib/social-image.tsx) Unsplash specifico -> Stability AI -> Unsplash generico
 # -> nessuna foto (fallback a scheda a sfondo piatto, gestito da build_card_html)
 
-def fetch_unsplash_photo(query: str) -> tuple[bytes, str] | None:
+def _hex_luminance(hex_color: str | None) -> float:
+    """Luminanza percepita 0-255 dal colore dominante restituito da Unsplash (campo "color").
+    Usata per scartare foto scure sulla scheda di apertura — un video che parte su una foto
+    buia si legge come "spento" anche a fondo nero rimosso dalla dissolvenza."""
+    if not hex_color or not hex_color.startswith("#") or len(hex_color) != 7:
+        return 128.0
+    r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+
+def fetch_unsplash_photo(query: str, pick_best: bool = False) -> tuple[bytes, str] | None:
+    """pick_best=True (usato per la scheda di apertura): prende più candidati, scarta quelli
+    troppo scuri (in base al colore dominante restituito da Unsplash) e tra i rimanenti sceglie
+    quello con più "likes" — proxy ragionevole di "foto più bella e luminosa" senza un vero
+    modello di visione. Per le altre schede prende semplicemente il più rilevante."""
     if not UNSPLASH_KEY:
         return None
     try:
         res = requests.get(
-            "https://api.unsplash.com/photos/random",
-            params={"query": query, "orientation": "portrait", "content_filter": "high", "client_id": UNSPLASH_KEY},
+            "https://api.unsplash.com/search/photos",
+            params={
+                "query": query, "orientation": "portrait", "content_filter": "high",
+                "order_by": "relevant", "per_page": 8 if pick_best else 3,
+                "client_id": UNSPLASH_KEY,
+            },
             headers={"Accept-Version": "v1"}, timeout=10,
         )
         if not res.ok:
             return None
-        img_url = (res.json().get("urls") or {}).get("regular")
+        results = res.json().get("results") or []
+        if not results:
+            return None
+        if pick_best:
+            bright = [p for p in results if _hex_luminance(p.get("color")) >= 90]
+            pool = bright if bright else results
+            photo = max(pool, key=lambda p: p.get("likes", 0))
+        else:
+            photo = results[0]
+        img_url = (photo.get("urls") or {}).get("regular")
         if not img_url:
             return None
         photo_res = requests.get(img_url, timeout=10)
@@ -156,8 +183,8 @@ def fetch_stability_photo(prompt: str) -> tuple[bytes, str] | None:
         return None
 
 
-def get_card_photo(unsplash_query: str) -> tuple[bytes, str] | None:
-    photo = fetch_unsplash_photo(unsplash_query) if unsplash_query else None
+def get_card_photo(unsplash_query: str, pick_best: bool = False) -> tuple[bytes, str] | None:
+    photo = fetch_unsplash_photo(unsplash_query, pick_best=pick_best) if unsplash_query else None
     if photo:
         return photo
     prompt = f"Cinematic {unsplash_query}, warm amber light, Italian bakery, professional food photography, no text, no logos"
@@ -242,18 +269,48 @@ def render_png(html: str, out_path: Path):
         raise RuntimeError(f"Chrome non ha prodotto {out_path}")
 
 
+MUSIC_STATE_PATH = MUSIC_DIR / ".rotation.json"
+
+
 def pick_music() -> Path | None:
-    tracks = list(MUSIC_DIR.glob("*.mp3"))
-    return random.choice(tracks) if tracks else None
+    """Alterna tra tutti i brani disponibili prima di ripeterne uno: tiene un ordine
+    mescolato in tools/reel-video/music/.rotation.json e avanza di uno a ogni chiamata,
+    rimescolando da capo solo dopo aver usato tutti i brani una volta."""
+    tracks = sorted(p.name for p in MUSIC_DIR.glob("*.mp3"))
+    if not tracks:
+        return None
+
+    state = {}
+    if MUSIC_STATE_PATH.exists():
+        try:
+            state = json.loads(MUSIC_STATE_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            state = {}
+
+    order = state.get("order") or []
+    position = state.get("position", 0)
+
+    if sorted(order) != tracks or position >= len(order):
+        order = tracks.copy()
+        random.shuffle(order)
+        position = 0
+
+    chosen = order[position]
+    MUSIC_STATE_PATH.write_text(json.dumps({"order": order, "position": position + 1}), encoding="utf-8")
+    return MUSIC_DIR / chosen
 
 
 def build_video(card_pngs: list, out_mp4: Path, tmp: Path):
     segments = []
     for i, png in enumerate(card_pngs):
         seg = tmp / f"seg{i}.mp4"
+        # La primissima scheda del video NON parte con dissolvenza dal nero: deve mostrare
+        # subito l'immagine di apertura a piena luce, altrimenti il primo istante (spesso
+        # usato come anteprima statica su Instagram) sembra un fotogramma nero.
+        fade_in = "" if i == 0 else f"fade=t=in:d={FADE},"
         subprocess.run(
             ["ffmpeg", "-y", "-loop", "1", "-i", str(png), "-t", str(CARD_DURATION),
-             "-vf", f"fade=t=in:d={FADE},fade=t=out:st={CARD_DURATION-FADE}:d={FADE},format=yuv420p",
+             "-vf", f"{fade_in}fade=t=out:st={CARD_DURATION-FADE}:d={FADE},format=yuv420p",
              "-r", "30", str(seg)],
             capture_output=True, check=True,
         )
@@ -342,7 +399,7 @@ def process_reel(row: dict):
         for i, card in enumerate(cards):
             query = card.get("unsplash_query", "")
             print(f"  📷 Foto scheda {i+1}/{len(cards)} ({query or 'nessuna query'})...")
-            photo = get_card_photo(query)
+            photo = get_card_photo(query, pick_best=(i == 0))
             if not photo:
                 print(f"     ⚠️  Nessuna foto trovata per '{query}', uso sfondo di riserva")
             png_path = tmp / f"card{i}.png"
