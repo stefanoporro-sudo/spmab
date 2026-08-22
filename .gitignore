@@ -9,5 +9,6 @@ node_modules/
 .env*
 !.env.local.example
 tools/reel-video/music/.rotation.json
+tools/reel-video/music/*.mp3
 __pycache__/
 *.pyc
